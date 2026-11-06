@@ -129,7 +129,7 @@ type SnapshotRow = {
  * centaines d'octets, et rien du tout tant que la table n'existe pas encore.
  */
 export async function loadStakeHistory(raceId: string, until: Date): Promise<{
-  baseline: { reading: StakeReading; minutes: number } | null;
+  baseline: { reading: StakeReading; observedAt: string } | null;
   morning: MorningOdds | null;
 }> {
   const sql = getSql();
@@ -150,7 +150,7 @@ export async function loadStakeHistory(raceId: string, until: Date): Promise<{
     return {
       baseline: row
         ? {
-            minutes: Math.round((until.getTime() - new Date(row.observed_at).getTime()) / 60_000),
+            observedAt: new Date(row.observed_at).toISOString(),
             reading: {
               numbers: row.numbers,
               stakeOffline: row.stake_offline,
