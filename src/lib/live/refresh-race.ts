@@ -1,6 +1,7 @@
 import { getSql } from "@/lib/db";
 import { fetchPmuJson, goingFromCourse, participantOddsWithSource, pmuRaceUrl, type PmuParticipant } from "@/lib/pmu/client";
 import { freezePrediction } from "@/lib/live/freeze";
+import { recordStakeSnapshot } from "@/lib/live/stakes";
 
 /**
  * RAFRAÎCHISSEMENT D'UNE COURSE — partagé par la boucle planifiée
@@ -263,6 +264,11 @@ async function applyRefresh(raceId: string, running: PmuParticipant[], listedNum
       [raceId, poolRows.map((r) => r.number), poolRows.map((r) => r.win), poolRows.map((r) => r.place), gap],
     );
   }
+
+  // Enjeux par cheval : leur échec ne doit jamais bloquer les cotes.
+  await recordStakeSnapshot(raceId, minutesToStart, gap).catch((error) => {
+    console.warn("stake_snapshots %s", raceId, error instanceof Error ? error.message : error);
+  });
 
   const frozen = minutesToStart > 0 ? await freezePrediction(raceId, minutesToStart) : [];
 

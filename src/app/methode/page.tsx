@@ -10,6 +10,7 @@ import { MARKET_GAMMA, MODEL_VERSION, PLACE_LAMBDAS } from "@/lib/probability";
 import { PROFILES_VERSION, PROFILE_LABELS, PROFILE_RULES, READING_LABELS, READING_RULES, type RaceReading } from "@/lib/profiles";
 import { ProfileBadge } from "@/components/course/shared";
 import { PRESS_THRESHOLDS } from "@/lib/press-consensus";
+import { STAKE_WINDOW_MIN } from "@/lib/stake-board";
 import {
   SURPRISE_FULL_AI_PCT,
   SURPRISE_FULL_RATIO,
@@ -190,8 +191,22 @@ export default function MethodePage() {
             <p>
               <strong className="text-fg">Parts des mises</strong> : part du cheval dans le pool simple gagnant du PMU,
               et sa variation sur {FLOW_WINDOW_MIN} minutes ({FLOW_ACCEL_WINDOW_MIN} minutes pour l&apos;accélération).
-              La tuile « Argent fort » s&apos;allume à +{STRONG_MONEY_PTS} points en {FLOW_WINDOW_MIN} minutes. Le PMU ne publie pas
-              les mises individuelles : nous mesurons une part des enjeux, jamais « l&apos;argent des initiés ».
+              La tuile « Argent fort » s&apos;allume à +{STRONG_MONEY_PTS} points en {FLOW_WINDOW_MIN} minutes. Le PMU publie les
+              enjeux par cheval, jamais par parieur : nous mesurons de l&apos;argent joué, jamais « l&apos;argent des initiés ».
+            </p>
+            <p>
+              <strong className="text-fg">Mises en direct</strong> : enjeux du simple gagnant publiés par le PMU, en point
+              de vente (PMU+) et en ligne (PMU Play). Le classement suit l&apos;argent reçu depuis un relevé vieux d&apos;au
+              moins {STAKE_WINDOW_MIN} minutes. Les mises d&apos;un cheval ne baissent pas en pari mutuel : la flèche est verte
+              s&apos;il reçoit plus vite que la course, rouge s&apos;il reçoit moins vite. La cote du matin est la cote de
+              référence du PMU, figée avant son recalage à 30 minutes du départ.
+            </p>
+            <p>
+              <strong className="text-fg">Force IA sur 100</strong> : probabilité du modèle fondamental, qui ne voit jamais
+              la cote, rapportée à une chance égale entre les partants. 50 correspond à la chance moyenne de la course, et
+              la note gagne 14 points chaque fois que cette chance double. Elle lit la musique, les gains, l&apos;âge, le sexe,
+              les œillères, le recul ou le numéro, et la réussite du jockey et de l&apos;entraîneur. Le modèle en production
+              ne lit encore ni la distance, ni le terrain, ni les chronos, ni le poids.
             </p>
             <p>
               <strong className="text-fg">Confrontation IA × marché</strong> : seuls les chevaux à au moins{" "}

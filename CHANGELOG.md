@@ -11,6 +11,7 @@ qu'un visiteur peut constater, vit dans `src/lib/changelog.ts` et s'affiche sur
 ## [Non publié]
 
 ### Ajouté
+- Mises en direct PMU+ / PMU Play × Force IA (`src/lib/stake-board.ts`, `src/lib/live/stakes.ts`, `src/components/course/stake-board.tsx`, `GET /api/races/[id]/stakes`) : enjeux par cheval des masses `SIMPLE_GAGNANT` et `E_SIMPLE_GAGNANT` (endpoint PMU `combinaisons`), cotes des deux masses, historique espacé dans `stake_snapshots`, cache CDN d'une minute. Cote du matin figée avant le recalage PMU de H-30. Note de force sur 100 tirée du modèle fondamental, sans cote.
 - Pronostiqueurs × Marché (`src/lib/press-consensus.ts`, `src/components/course/press-panel.tsx`) : sélections des sites de pronostics (table `press_selections`, `scripts/import-press.mjs`) comparées au marché ; trois catégories, deux alertes, degré d'accord ; signaux `presse-*` au backtest, sélections relevées avant la cote de décision seulement.
 
 ### Modifié

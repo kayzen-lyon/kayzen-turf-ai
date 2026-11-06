@@ -22,6 +22,20 @@ export type EntreeChangelog = {
 
 export const CHANGELOG: readonly EntreeChangelog[] = [
   {
+    date: "2026-11-06",
+    titre: "Mises en direct PMU+ / PMU Play × Force IA",
+    changements: [
+      {
+        categorie: "Ajouté",
+        elements: [
+          "Page course, tout en bas : un tableau unique avec, pour chaque cheval, la cote du matin et la cote actuelle en PMU+ et en PMU Play, le total des mises en euros et l'argent reçu sur les dernières minutes.",
+          "Note de force IA sur 100, calculée sans jamais voir la cote, à comparer aux mises et aux cotes.",
+          "Classement par argent reçu, relu chaque minute jusqu'au départ.",
+        ],
+      },
+    ],
+  },
+  {
     date: "2026-10-31",
     titre: "Pronostiqueurs × Marché",
     changements: [

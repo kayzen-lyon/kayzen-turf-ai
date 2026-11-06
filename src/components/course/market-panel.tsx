@@ -93,7 +93,7 @@ export function MarketPanel({ row, history }: { row: HorseRow | null; history: M
       </div>
 
       <p className="mt-4 text-[11px] leading-5 text-muted">
-        Source : PMU uniquement. Le PMU ne publie pas les mises individuelles : une part qui monte dit que le cheval
+        Source : PMU uniquement. Le PMU publie les enjeux par cheval, jamais par parieur : une part qui monte dit que le cheval
         est davantage joué, pas qui le joue.
       </p>
     </Card>

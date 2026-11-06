@@ -309,6 +309,23 @@ create table if not exists pool_snapshots (
   primary key (race_id, observed_at)
 );
 
+-- Enjeux du simple gagnant par cheval (€) et cotes, pour les deux masses PMU :
+-- point de vente (offline) et en ligne (online). `numbers[i]` porte les valeurs
+-- d'indice i. `ref_*` : cote du matin, écrite au seul premier relevé fait avant
+-- que le PMU ne recale sa cote de référence, à H-30.
+create table if not exists stake_snapshots (
+  race_id text not null references races(id) on delete cascade,
+  observed_at timestamptz not null,
+  numbers smallint[] not null,
+  stake_offline integer[] not null,
+  stake_online integer[] not null,
+  odds_offline real[] not null,
+  odds_online real[] not null,
+  ref_offline real[],
+  ref_online real[],
+  primary key (race_id, observed_at)
+);
+
 -- Pronostic tel qu'il était affiché avant le départ, gelé. Sans lui, aucun
 -- suivi honnête : recalculer après coup utiliserait la cote finale, que
 -- personne ne connaissait au moment de jouer.
