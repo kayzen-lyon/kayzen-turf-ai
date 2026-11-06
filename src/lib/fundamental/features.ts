@@ -123,6 +123,9 @@ export const ALL_FEATURE_LABELS = {
   classMissing: "Catégorie précédente inconnue",
   comboRuns: "Courses avec ce jockey/driver",
   comboRate: "Réussite du couple cheval-jockey",
+  chronoBest: "Meilleur chrono récent (réduction km, écart au peloton)",
+  chronoLast: "Dernier chrono (réduction km, écart au peloton)",
+  chronoMissing: "Aucun chrono connu",
 } as const;
 
 export type FeatureName = keyof typeof ALL_FEATURE_LABELS;
@@ -163,6 +166,7 @@ export const FEATURE_GROUPS = {
   aptitude: ["distAptitude", "goingAptitude", "courseAptitude"],
   class: ["classChange", "classMissing"],
   combo: ["comboRuns", "comboRate"],
+  chrono: ["chronoBest", "chronoLast", "chronoMissing"],
 } as const satisfies Record<string, readonly FeatureName[]>;
 
 export type FeatureGroup = keyof typeof FEATURE_GROUPS;
@@ -289,6 +293,8 @@ function horseRecord(
     letter: string | null;
     autostart: boolean;
     sprint: boolean;
+    meanBestKm: number | null;
+    meanLastKm: number | null;
   },
 ): Record<FeatureName, number> {
   const { discipline, fieldSize } = ctx;
@@ -361,6 +367,10 @@ function horseRecord(
     classMissing: h?.classChange == null ? 1 : 0,
     comboRuns: Math.log1p(h?.comboRuns ?? 0),
     comboRate: shrunkTop3(h?.comboTop3 ?? 0, h?.comboRuns ?? 0),
+    // Trot seul : secondes gagnées sur la moyenne du peloton (positif = plus rapide).
+    chronoBest: discipline === "Trot" && h?.bestKm != null && ctx.meanBestKm !== null ? ctx.meanBestKm - h.bestKm : 0,
+    chronoLast: discipline === "Trot" && h?.lastKm != null && ctx.meanLastKm !== null ? ctx.meanLastKm - h.lastKm : 0,
+    chronoMissing: discipline === "Trot" && h?.bestKm == null ? 1 : 0,
   };
 }
 
@@ -384,6 +394,10 @@ export function computeFeatures(
   const draws = field.map((h) => Number(h.draw)).filter((d) => Number.isFinite(d) && d >= 1);
   const kgs = field.map((h) => weightKg(h.weight)).filter((w): w is number => w !== null);
   const race = contextOf(field, context);
+  const meanOf = (values: Array<number | null | undefined>) => {
+    const known = values.filter((v): v is number => v != null);
+    return known.length ? known.reduce((a, b) => a + b, 0) / known.length : null;
+  };
   const raceDistance = Number(String(race.distance ?? "").replace(/[^\d]/g, ""));
 
   const ctx = {
@@ -397,6 +411,8 @@ export function computeFeatures(
     letter: specialtyLetter(race.specialty, discipline),
     autostart: String(race.startType ?? "").toLowerCase().startsWith("auto"),
     sprint: raceDistance > 0 && raceDistance <= 1400,
+    meanBestKm: meanOf(field.map((h) => h.history?.bestKm)),
+    meanLastKm: meanOf(field.map((h) => h.history?.lastKm)),
   };
 
   return field.map((horse, i) => {

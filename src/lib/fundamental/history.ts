@@ -37,6 +37,8 @@ export type PastRun = {
   jockeyId?: string | null;
   /** Code de déferrage de cette sortie (trot). */
   shoeing?: string | null;
+  /** Réduction kilométrique RÉALISÉE dans cette sortie (millièmes de seconde). Passée : connue avant la course du jour. */
+  reductionKm?: number | string | null;
 };
 
 /** Ce que l'on sait de la course du jour, pour situer l'historique. */
@@ -77,6 +79,10 @@ export type HorseHistory = {
   comboTop3: number;
   /** Déferrage lors de la dernière sortie (pour repérer un « 1er déferré »). */
   lastShoeing: string | null;
+  /** Meilleure réduction km (secondes) sur les 6 dernières sorties, `null` si aucune. */
+  bestKm: number | null;
+  /** Réduction km (secondes) de la sortie chronométrée la plus récente, `null` si aucune. */
+  lastKm: number | null;
 };
 
 export const EMPTY_HISTORY: HorseHistory = {
@@ -95,6 +101,8 @@ export const EMPTY_HISTORY: HorseHistory = {
   comboRuns: 0,
   comboTop3: 0,
   lastShoeing: null,
+  bestKm: null,
+  lastKm: null,
 };
 
 const DAY_MS = 86_400_000;
@@ -127,6 +135,12 @@ function relFinish(run: PastRun): number {
   if (!run.position || !Number.isFinite(pos) || pos < 1) return 1;
   if (!Number.isFinite(size) || size < 2) return pos === 1 ? 0 : 1;
   return Math.min(1, (pos - 1) / (size - 1));
+}
+
+/** Réduction km d'une sortie en secondes ; hors plage plausible (0 compris) → `null`. */
+function kmSeconds(run: PastRun): number | null {
+  const v = Number(run.reductionKm);
+  return Number.isFinite(v) && v > 40_000 && v < 200_000 ? v / 1000 : null;
 }
 
 function isTop3(run: PastRun) {
@@ -182,6 +196,8 @@ export function computeHorseHistory(runs: readonly PastRun[], today: HistoryToda
       ? Math.max(-2, Math.min(2, Math.log(todayPrize / median(prizes))))
       : null;
 
+  const timed = past.slice(0, 6).map(kmSeconds).filter((k): k is number => k !== null);
+
   return {
     runs: past.length,
     daysSinceLast: todayDay - dayNumber(past[0].date),
@@ -198,6 +214,8 @@ export function computeHorseHistory(runs: readonly PastRun[], today: HistoryToda
     comboRuns: combo.runs,
     comboTop3: combo.top3,
     lastShoeing: past[0].shoeing ?? null,
+    bestKm: timed.length ? Math.min(...timed) : null,
+    lastKm: timed.length ? timed[0] : null,
   };
 }
 
@@ -213,6 +231,7 @@ export type PastRunRow = {
   prize: number | string | null;
   jockey_id: string | null;
   shoeing: string | null;
+  reduction_km?: string | null;
 };
 
 export function pastRunFromRow(row: PastRunRow): PastRun {
@@ -227,6 +246,7 @@ export function pastRunFromRow(row: PastRunRow): PastRun {
     prize: Number.isFinite(prize) && prize > 0 ? prize : null,
     jockeyId: row.jockey_id,
     shoeing: row.shoeing,
+    reductionKm: row.reduction_km ?? null,
   };
 }
 
@@ -265,7 +285,7 @@ export async function fetchHorseHistories(
     select horse_id, race_date, position,
            -- Taille du peloton calculée après le filtre rn : seulement pour les sorties gardées.
            (select count(*) from entries c where c.race_id = t.race_id)::int as field_size,
-           distance, going, racecourse, prize, jockey_id, shoeing
+           distance, going, racecourse, prize, jockey_id, shoeing, reduction_km
       from (
         select e.horse_id,
                r.race_date::text as race_date,
@@ -277,6 +297,7 @@ export async function fetchHorseHistories(
                (to_jsonb(r)->>'prize') as prize,
                e.jockey_id::text as jockey_id,
                coalesce(e.shoeing, case when e.equipment like 'DEFERRE%' or e.equipment like 'PROTEGE%' then e.equipment end) as shoeing,
+               e.reduction_km,
                row_number() over (partition by e.horse_id order by r.race_date desc, r.id desc) as rn
           from entries e
           join races r on r.id = e.race_id

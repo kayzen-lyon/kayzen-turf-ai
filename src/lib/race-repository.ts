@@ -516,6 +516,7 @@ async function loadPressSelections(raceIds: string[]): Promise<Map<string, NonNu
 const HISTORY_FEATURES = new Set([
   "daysSinceLog", "longBreak", "runs90d", "historyMissing", "bestRelFinish", "avgRelFinish",
   "distAptitude", "goingAptitude", "courseAptitude", "classChange", "classMissing", "comboRuns", "comboRate", "shoeFirstTime",
+  "chronoBest", "chronoLast", "chronoMissing",
 ]);
 
 /**

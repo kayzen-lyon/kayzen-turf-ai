@@ -48,6 +48,8 @@ export type DatasetRow = FundamentalInput & {
   trainer_id: string | null;
   odds: number | null;
   pos: number | null;
+  /** Chrono RÉALISÉ dans cette course : n'entre que dans l'historique des courses suivantes. */
+  reduction_km?: string | null;
 };
 
 function toNumber(value: unknown): number | null {
@@ -56,8 +58,13 @@ function toNumber(value: unknown): number | null {
 }
 
 export async function loadDataset(databaseUrl: string): Promise<DatasetRace[]> {
+  return buildDataset(await loadDatasetRows(databaseUrl));
+}
+
+/** Lignes brutes triées par date (exporté pour rejouer un banc sans relire la base). */
+export async function loadDatasetRows(databaseUrl: string): Promise<DatasetRow[]> {
   const sql = neon(databaseUrl);
-  const rows = (await sql`
+  return (await sql`
     select e.race_id, r.race_date::text as race_date, r.discipline, r.specialty,
            (to_jsonb(r)->>'start_type') as start_type, r.distance, r.going,
            (to_jsonb(r)->>'prize') as prize, r.racecourse_id::text as racecourse,
@@ -66,7 +73,7 @@ export async function loadDataset(databaseUrl: string): Promise<DatasetRace[]> {
            e.handicap_distance as "handicapDistance", e.draw, e.weight::float8 as weight, e.shoeing,
            (to_jsonb(e)->>'blinkers') as blinkers,
            e.jockey_id::text as jockey_id, e.trainer_id::text as trainer_id,
-           e.odds::float8 as odds, res.finish_position as pos
+           e.odds::float8 as odds, res.finish_position as pos, e.reduction_km
       from entries e
       join races r on r.id = e.race_id
       join horses h on h.id = e.horse_id
@@ -74,7 +81,6 @@ export async function loadDataset(databaseUrl: string): Promise<DatasetRace[]> {
      where exists (select 1 from results w where w.race_id = e.race_id and w.finish_position = 1)
      order by r.race_date, e.race_id, e.number
   `) as DatasetRow[];
-  return buildDataset(rows);
 }
 
 /** Construit le jeu point-in-time à partir des lignes triées par date (exporté pour les tests). */
@@ -165,6 +171,7 @@ export function buildDataset(rows: DatasetRow[]): DatasetRace[] {
           prize: toNumber(h.prize),
           jockeyId: h.jockey_id,
           shoeing: h.shoeing ?? (/^(DEFERRE|PROTEGE)/.test(String(h.equipment ?? "")) ? h.equipment : null),
+          reductionKm: h.reduction_km,
         });
         if (list.length > HISTORY_MAX_RUNS) list.shift();
         pastRuns.set(h.horse_id, list);

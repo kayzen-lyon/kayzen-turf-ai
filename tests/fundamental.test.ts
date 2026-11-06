@@ -287,8 +287,8 @@ describe("historique en base (computeHorseHistory)", () => {
   });
 
   it("lignes SQL → courses passées", () => {
-    const run = pastRunFromRow({ horse_id: "H", race_date: "2026-01-02", position: 3, field_size: 12, distance: "2 850 m", going: "Bon", racecourse: "x", prize: "25000", jockey_id: "J", shoeing: null });
-    assert.deepEqual(run, { date: "2026-01-02", position: 3, fieldSize: 12, distance: 2850, going: "Bon", racecourse: "x", prize: 25000, jockeyId: "J", shoeing: null });
+    const run = pastRunFromRow({ horse_id: "H", race_date: "2026-01-02", position: 3, field_size: 12, distance: "2 850 m", going: "Bon", racecourse: "x", prize: "25000", jockey_id: "J", shoeing: null, reduction_km: "72500" });
+    assert.deepEqual(run, { date: "2026-01-02", position: 3, fieldSize: 12, distance: 2850, going: "Bon", racecourse: "x", prize: 25000, jockeyId: "J", shoeing: null, reductionKm: "72500" });
     assert.equal(parseDistance("abc"), null);
   });
 });
@@ -316,6 +316,30 @@ describe("jeu de données point-in-time (buildDataset)", () => {
     assert.equal(races[2].field[0].history?.daysSinceLast, 4);
     assert.equal(races[2].field[0].jockeyRuns, 8);
     assert.equal(races[2].context.specialty, "TROT_ATTELE");
+  });
+
+  it("le chrono d'une course n'est lu que par les courses des jours suivants", () => {
+    const row = (race: string, date: string, horse: string, number: number, km: string | null): DatasetRow =>
+      ({
+        race_id: race, race_date: date, discipline: "Trot", specialty: "TROT_ATTELE", start_type: null, distance: "2100", going: null, prize: "10000",
+        racecourse: "C", horse_id: horse, number, music: null, earnings: 0, age: 5, sex: "MALES", equipment: null, handicapDistance: 2100,
+        draw: null, weight: null, shoeing: null, blinkers: null, jockey_id: "J", trainer_id: "T", odds: 5, pos: number, reduction_km: km,
+      }) as DatasetRow;
+    const horses = ["A", "B", "C", "D"];
+    const races = buildDataset([
+      ...horses.map((h, i) => row("R1", "2026-01-01", h, i + 1, String(72000 + i * 1000))),
+      ...horses.map((h, i) => row("R2", "2026-01-01", h, i + 1, "60000")),
+      ...horses.map((h, i) => row("R3", "2026-01-05", h, i + 1, null)),
+    ]);
+    const names = ["chronoBest", "chronoLast", "chronoMissing"] as const;
+    const chrono = (r: number) => computeFeatures(races[r].field, "Trot", names, races[r].context);
+    // Jour même : ni le chrono de la course, ni celui d'une course plus tôt le même jour.
+    assert.deepEqual(chrono(1)[0], [0, 0, 1]);
+    // Plus tard : meilleur chrono 60"0 pour tous (écart nul) ; dernier chrono de A 72"0 contre 73"5 en moyenne.
+    assert.equal(races[2].field[0].history?.bestKm, 60);
+    assert.deepEqual(chrono(2)[0], [0, 1.5, 0]);
+    // Au plat, la variable reste nulle même avec un historique chronométré.
+    assert.deepEqual(computeFeatures(races[2].field, "Plat", names, races[2].context)[0], [0, 0, 0]);
   });
 });
 
