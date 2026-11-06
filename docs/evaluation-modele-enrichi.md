@@ -101,6 +101,15 @@ Ce sont des bornes : le nombre réel de recharges dépend du trafic, et la conso
    - suivre le candidat en parallèle pendant 4 semaines, puis l'activer seulement si le gain tient.
 4. Présenter la note sur 100 comme une note sportive, sans lui prêter une supériorité sur la cote.
 
+## Capture des chronos (préparée, pas encore en production)
+
+- **Colonne :** `entries.realized_km`, ajoutée par `npm run db:schema`. Le site ne la lit pas ; seuls `dataset.ts` et `fetchHorseHistories` la lisent, pour l'historique des courses suivantes.
+- **Import :** elle est remplie dès que l'arrivée est publiée, et la dernière valeur fait foi.
+- **Rattrapage :** `node scripts/backfill-realized-km.mjs` est à blanc par défaut et n'écrit qu'avec `--apply`, jamais par-dessus une valeur existante.
+- **Essai à blanc sur 30 courses :** 302 chronos lus, et le meilleur gagne 90 % des courses. C'est bien le chrono réalisé que renvoie l'API.
+
+Le candidat reste non branché. Il reste à calculer les variables à l'import, puis à mesurer le candidat figé sur les nouvelles courses pendant 4 semaines.
+
 ## Changements de code
 
 Aucun effet sur le site tant que `model.json` reste en format 1.

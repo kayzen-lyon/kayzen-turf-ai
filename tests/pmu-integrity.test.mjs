@@ -10,6 +10,7 @@ import {
   blinkersFromParticipant,
   entryUpsertParams,
   entryUpsertSql,
+  realizedKm,
   hasRaceStarted,
   parseMusicSignal,
   preRaceConnectionStats,
@@ -202,6 +203,21 @@ describe("entryUpsertSql — gel des données d'avant-course", () => {
       assert.match(query, /reduction_km = coalesce\(entries\.reduction_km, excluded\.reduction_km\)/);
       assert.match(query, /speed_figure = coalesce\(entries\.speed_figure, excluded\.speed_figure\)/);
     }
+  });
+
+  it("chrono réalisé : la dernière valeur publiée, sans effacer la précédente", () => {
+    for (const started of [false, true]) {
+      assert.match(entryUpsertSql(started), /realized_km = coalesce\(excluded\.realized_km, entries\.realized_km\)/);
+    }
+  });
+
+  it("chrono réalisé : rien sans arrivée, rien hors plage", () => {
+    const arrival = [[3], [1]];
+    assert.equal(realizedKm({ reductionKilometrique: 74300 }, arrival), 74300);
+    assert.equal(realizedKm({ reductionKilometrique: 74300 }, []), null);
+    assert.equal(realizedKm({ reductionKilometrique: 74300 }, undefined), null);
+    assert.equal(realizedKm({ reductionKilometrique: 0 }, arrival), null);
+    assert.equal(realizedKm({}, arrival), null);
   });
 
   it("statistiques d'avant-course : la plus récente, sans jamais effacer la valeur figée", () => {

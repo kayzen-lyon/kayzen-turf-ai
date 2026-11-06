@@ -297,7 +297,7 @@ export async function fetchHorseHistories(
                (to_jsonb(r)->>'prize') as prize,
                e.jockey_id::text as jockey_id,
                coalesce(e.shoeing, case when e.equipment like 'DEFERRE%' or e.equipment like 'PROTEGE%' then e.equipment end) as shoeing,
-               e.reduction_km,
+               coalesce(to_jsonb(e)->>'realized_km', e.reduction_km) as reduction_km,
                row_number() over (partition by e.horse_id order by r.race_date desc, r.id desc) as rn
           from entries e
           join races r on r.id = e.race_id

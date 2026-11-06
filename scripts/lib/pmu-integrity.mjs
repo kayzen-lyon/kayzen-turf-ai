@@ -206,6 +206,7 @@ export const ENTRY_COLUMNS = [
   "top3_probability", "top5_probability", "kz_score", "value_index",
   "confidence", "factors",
   "jockey_runs_pre", "jockey_wins_pre", "trainer_runs_pre", "trainer_wins_pre",
+  "realized_km",
 ];
 
 /** Identité du partant : toujours à jour (un changement de driver est un fait, pas une prévision). */
@@ -229,6 +230,12 @@ const FIRST_VALUE_WINS = new Set(["speed_figure", "reduction_km"]);
 const LATEST_PRE_RACE = new Set(["jockey_runs_pre", "jockey_wins_pre", "trainer_runs_pre", "trainer_wins_pre"]);
 
 /**
+ * Chrono réalisé (voir `realizedKm`) : connu après l'arrivée, jamais une donnée
+ * d'avant-course. La dernière valeur publiée fait foi, sans effacer la précédente.
+ */
+const LATEST_AFTER_RACE = new Set(["realized_km"]);
+
+/**
  * Requête d'insertion/mise à jour d'un partant.
  *
  * Course pas encore partie : tout est rafraîchi (déclarations, cotes, pronostic).
@@ -241,7 +248,7 @@ export function entryUpsertSql(raceStarted) {
   const updates = ENTRY_COLUMNS.filter((column) => column !== "id").map((column) => {
     if (ALWAYS_UPDATED.has(column)) return `${column} = excluded.${column}`;
     if (FIRST_VALUE_WINS.has(column)) return `${column} = coalesce(entries.${column}, excluded.${column})`;
-    if (LATEST_PRE_RACE.has(column)) return `${column} = coalesce(excluded.${column}, entries.${column})`;
+    if (LATEST_PRE_RACE.has(column) || LATEST_AFTER_RACE.has(column)) return `${column} = coalesce(excluded.${column}, entries.${column})`;
     // L'origine suit la cote : une cote gelée garde son origine (NULL pour
     // l'historique), elle ne reçoit pas celle de la cote finale qu'on écarte.
     if (column === "odds_source" && raceStarted) {
@@ -254,6 +261,17 @@ export function entryUpsertSql(raceStarted) {
 values (${placeholders.join(", ")})
 on conflict (id) do update set
   ${updates.join(",\n  ")}`;
+}
+
+/**
+ * Réduction kilométrique RÉALISÉE (millièmes de seconde), `null` tant que l'arrivée
+ * n'est pas publiée ou si la valeur est hors plage. Elle ne sert qu'à l'historique
+ * des courses SUIVANTES du cheval : ne jamais la lire pour la course elle-même.
+ */
+export function realizedKm(participant, ordreArrivee) {
+  if (arrivalPlacings(ordreArrivee).length === 0) return null;
+  const value = Number(participant?.reductionKilometrique);
+  return Number.isFinite(value) && value > 40000 && value < 200000 ? value : null;
 }
 
 /** Paramètres de `entryUpsertSql`, dans l'ordre de `ENTRY_COLUMNS`. */

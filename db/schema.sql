@@ -122,6 +122,11 @@ alter table entries add column if not exists draw integer;
 alter table entries add column if not exists shoeing text;
 alter table entries add column if not exists speed_figure numeric;
 
+-- Chrono RÉALISÉ dans la course (millièmes de seconde), écrit après l'arrivée.
+-- Il ne sert qu'à l'historique des courses SUIVANTES du cheval (groupe `chrono`
+-- du modèle fondamental) : le lire pour la course elle-même, c'est lire le résultat.
+alter table entries add column if not exists realized_km numeric;
+
 -- Répartition réelle des enjeux, relevée sur l'endpoint `citations` de l'API PMU
 -- (part du pool misée sur chaque cheval, en %). Le pool gagnant recopie ce que
 -- la cote dit déjà. Les deux autres portent une information que nous n'avons pas :

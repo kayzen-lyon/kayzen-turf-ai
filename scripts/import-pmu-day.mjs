@@ -13,6 +13,7 @@ import {
   preRaceConnectionStats,
   prizeFromCourse,
   startTypeFromCourse,
+  realizedKm,
 } from "./lib/pmu-integrity.mjs";
 
 const PMU_BASE = "https://offline.turfinfo.api.pmu.fr/rest/client/7/programme";
@@ -564,6 +565,7 @@ async function importDate(sql, pmuDate, maxRaces, connectionStats) {
             jockey_wins_pre: preStats.jockeyWinsPre,
             trainer_runs_pre: preStats.trainerRunsPre,
             trainer_wins_pre: preStats.trainerWinsPre,
+            realized_km: realizedKm(participant, course.ordreArrivee),
           }),
         );
 

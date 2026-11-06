@@ -73,7 +73,8 @@ export async function loadDatasetRows(databaseUrl: string): Promise<DatasetRow[]
            e.handicap_distance as "handicapDistance", e.draw, e.weight::float8 as weight, e.shoeing,
            (to_jsonb(e)->>'blinkers') as blinkers,
            e.jockey_id::text as jockey_id, e.trainer_id::text as trainer_id,
-           e.odds::float8 as odds, res.finish_position as pos, e.reduction_km
+           e.odds::float8 as odds, res.finish_position as pos,
+           coalesce(to_jsonb(e)->>'realized_km', e.reduction_km) as reduction_km
       from entries e
       join races r on r.id = e.race_id
       join horses h on h.id = e.horse_id
