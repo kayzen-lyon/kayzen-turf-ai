@@ -17,6 +17,7 @@ import { MarketPanel } from "@/components/course/market-panel";
 import { NonRunners } from "@/components/course/non-runners";
 import { SectionNavBar, SectionNavRail } from "@/components/course/section-nav";
 import { PressPanel } from "@/components/course/press-panel";
+import { StakeBoardPanel } from "@/components/course/stake-board";
 import { SurprisePanel } from "@/components/course/surprise-panel";
 import { PostRacePanel, SimulationPanel } from "@/components/course/side-panels";
 import { TicketShare } from "@/components/course/ticket-share";
@@ -54,7 +55,8 @@ import type { RaceAnalysis } from "@/lib/types";
  *      Cotes & Marché, Forme), puis le comparateur et le carré magique 16 partants ;
  *   5. la fiche du cheval sélectionné ; à côté, son marché, les cotes de tous
  *      les partants et la simulation ;
- *   6. les tickets : copie au format PMU, partage en image, outils repliés.
+ *   6. les tickets : copie au format PMU, partage en image, outils repliés ;
+ *   7. tout en bas, les mises en direct PMU+ / PMU Play × force IA.
  *
  * Un sommaire (rail sur grand écran, pastilles sur mobile) suit la lecture.
  * Les blocs vivent sous src/components/course/.
@@ -265,6 +267,10 @@ export function CourseDetail({ race, history = EMPTY_HISTORY, signals = NO_SIGNA
                 </div>
                 {frozen}
               </aside>
+            </div>
+
+            <div className={SECTION_SCROLL} id="mises-direct">
+              <StakeBoardPanel onSelect={select} race={race} signals={signalMap} vm={vm} />
             </div>
           </div>
         </div>

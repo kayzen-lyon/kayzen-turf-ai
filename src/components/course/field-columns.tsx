@@ -79,7 +79,7 @@ export const FOOTNOTES: Record<Tab, ReactNode> = {
       Classement du marché, du plus joué au plus délaissé. <Term name="MVT">MVT</Term> — cote du matin : premier relevé du jour ; une variation sous ±
       {MVT_NOISE_PCT} % est tenue pour du bruit, une cote qui baisse signifie que le cheval est joué. Argent : part du cheval dans le pool simple gagnant
       du PMU, sa variation sur 15 min (flèche au-delà de ±{String(FLOW_TREND_PTS).replace(".", ",")} pt) et l&apos;accélération sur 5 min (éclair à +
-      {FLOW_ACCEL_PTS} pt). Le PMU ne publie pas les mises individuelles : une part qui monte dit que le cheval est joué, pas par qui.
+      {FLOW_ACCEL_PTS} pt). Le PMU publie les enjeux par cheval, jamais par parieur : une part qui monte dit que le cheval est joué, pas par qui.
     </>
   ),
   "Cotes & Marché": (
