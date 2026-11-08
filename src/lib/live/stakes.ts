@@ -26,6 +26,15 @@ export type LiveStakes = {
   morning: MorningOdds;
   /** Dernière publication du PMU (ISO). */
   updatedAt: string | null;
+  /** Au moins une lecture PMU attendue a échoué : la réponse ne doit pas être gardée longtemps. */
+  partial: boolean;
+  /**
+   * Course internationale : le PMU n'y tient qu'une masse commune au point de
+   * vente et en ligne (`SIMPLE_GAGNANT_INTERNATIONAL`, mêmes montants dans les
+   * deux listes). Elle est rangée côté point de vente, rien côté en ligne :
+   * l'additionner deux fois doublerait chaque euro.
+   */
+  international: boolean;
 };
 
 function odds(value: unknown): number | null {
@@ -43,24 +52,47 @@ function readStakes(payload: Combinaisons | null, type: string): { stakes: Map<n
   return { stakes, updatedAt: bloc?.updateTime ?? null };
 }
 
-/** Lit les deux masses. `null` si le PMU ne publie encore aucune mise pour la course. */
+/**
+ * Lit les deux masses. `null` si le PMU ne publie encore aucune mise pour la
+ * course ; lève si les quatre lectures échouent, pour qu'une panne ne passe
+ * jamais pour « aucune mise » (et ne soit pas mise en cache comme telle).
+ */
 export async function fetchRaceStakes(raceId: string): Promise<LiveStakes | null> {
-  const [combOff, combOn, rapOff, rapOn] = await Promise.allSettled([
+  const settled = await Promise.allSettled([
     fetchPmuJson<Combinaisons>(pmuRaceUrl(raceId, "/combinaisons?specialisation=OFFLINE")!),
     fetchPmuJson<Combinaisons>(pmuRaceUrl(raceId, "/combinaisons?specialisation=INTERNET")!),
     fetchPmuJson<Rapports>(pmuRaceUrl(raceId, "/rapports/SIMPLE_GAGNANT")!),
     fetchPmuJson<Rapports>(pmuRaceUrl(raceId, "/rapports/E_SIMPLE_GAGNANT")!),
   ]);
+  const failures = settled.filter((r) => r.status === "rejected").length;
+  // Sans aucune des deux lectures d'enjeux, rien ne distingue « pas encore de
+  // mises » d'une panne : on lève plutôt que de répondre « aucune mise ».
+  if (settled[0].status === "rejected" && settled[1].status === "rejected") throw new Error(`Enjeux PMU illisibles pour ${raceId}`);
+  const [combOff, combOn, rapOff, rapOn] = settled as [
+    PromiseSettledResult<Combinaisons>,
+    PromiseSettledResult<Combinaisons>,
+    PromiseSettledResult<Rapports>,
+    PromiseSettledResult<Rapports>,
+  ];
   const value = <T,>(r: PromiseSettledResult<T>) => (r.status === "fulfilled" ? r.value : null);
-  const offline = readStakes(value(combOff), "SIMPLE_GAGNANT");
+  let offline = readStakes(value(combOff), "SIMPLE_GAGNANT");
   const online = readStakes(value(combOn), "E_SIMPLE_GAGNANT");
+  let rapOffValue = value(rapOff);
+  let partial = failures > 0;
+  const international = offline.stakes.size === 0 && online.stakes.size === 0 && readStakes(value(combOff), "SIMPLE_GAGNANT_INTERNATIONAL").stakes.size > 0;
+  if (international) {
+    offline = readStakes(value(combOff), "SIMPLE_GAGNANT_INTERNATIONAL");
+    // Les rapports nationaux n'existent pas pour ces courses (réponse vide) : seul celui de la masse commune compte.
+    rapOffValue = await fetchPmuJson<Rapports>(pmuRaceUrl(raceId, "/rapports/SIMPLE_GAGNANT_INTERNATIONAL")!).catch(() => null);
+    partial = rapOffValue === null;
+  }
   if (offline.stakes.size === 0 && online.stakes.size === 0) return null;
 
-  const oddsOff = new Map((value(rapOff)?.rapportsParticipant ?? []).map((p) => [Number(p.numPmu), p]));
-  const oddsOn = new Map((value(rapOn)?.rapportsParticipant ?? []).map((p) => [Number(p.numPmu), p]));
+  const oddsOff = new Map((rapOffValue?.rapportsParticipant ?? []).map((p) => [Number(p.numPmu), p]));
+  const oddsOn = new Map((international ? [] : (value(rapOn)?.rapportsParticipant ?? [])).map((p) => [Number(p.numPmu), p]));
   const numbers = [...new Set([...offline.stakes.keys(), ...online.stakes.keys(), ...oddsOff.keys(), ...oddsOn.keys()])].sort((a, b) => a - b);
 
-  const times = [offline.updatedAt, online.updatedAt, value(rapOff)?.dateMajDirect ?? null, value(rapOn)?.dateMajDirect ?? null].filter((t): t is number => Number.isFinite(t));
+  const times = [offline.updatedAt, online.updatedAt, rapOffValue?.dateMajDirect ?? null, international ? null : (value(rapOn)?.dateMajDirect ?? null)].filter((t): t is number => Number.isFinite(t));
   return {
     reading: {
       numbers,
@@ -75,6 +107,8 @@ export async function fetchRaceStakes(raceId: string): Promise<LiveStakes | null
       refOnline: numbers.map((n) => odds(oddsOn.get(n)?.rapportReference)),
     },
     updatedAt: times.length ? new Date(Math.max(...times)).toISOString() : null,
+    partial,
+    international,
   };
 }
 

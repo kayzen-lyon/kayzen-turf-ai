@@ -694,7 +694,15 @@ function parseJsonArray<T>(value: T[] | string | null | undefined): T[] {
  * enjeux. Deux requêtes indexées (race_id en tête de clé), quelques centaines
  * de lignes au plus.
  */
-export async function getRaceMarketHistory(raceId: string): Promise<MarketHistory> {
+/**
+ * `strict` : une lecture en échec lève au lieu de renvoyer une valeur vide. Les
+ * pages de courses terminées gardent leurs lectures un jour (`loadSettled`) :
+ * une panne passagère de Neon y était enregistrée comme « aucune donnée » pour
+ * vingt-quatre heures (audit du 08/11/2026).
+ */
+export type ReadOptions = { strict?: boolean };
+
+export async function getRaceMarketHistory(raceId: string, options: ReadOptions = {}): Promise<MarketHistory> {
   if (!hasDatabase()) return { odds: {}, pools: [] };
   const sql = getSql();
   try {
@@ -722,6 +730,7 @@ export async function getRaceMarketHistory(raceId: string): Promise<MarketHistor
   } catch (cause) {
     // L'historique enrichit la page, il ne la conditionne pas.
     console.error("Historique de marché indisponible pour %s", raceId, cause);
+    if (options.strict) throw cause;
     return { odds: {}, pools: [] };
   }
 }
@@ -752,22 +761,22 @@ export type TrackRecordSummary = {
  */
 export async function getLatestTrackRecord(): Promise<(TrackRecordSummary & Record<string, unknown>) | null> {
   if (!hasDatabase()) return null;
-  return loadLatestTrackRecordCached();
+  // Une lecture en échec lève dans le cache et n'y est donc pas gardée : la
+  // page affichait sinon « premier rapport en cours de calcul » pendant une heure.
+  return loadLatestTrackRecordCached().catch((cause) => {
+    console.error("Suivi de performance indisponible", cause);
+    return null;
+  });
 }
 
 const loadLatestTrackRecordCached = unstable_cache(loadLatestTrackRecord, ["track-record-latest"], { revalidate: 3600 });
 
 async function loadLatestTrackRecord(): Promise<(TrackRecordSummary & Record<string, unknown>) | null> {
-  try {
-    const sql = getSql();
-    const rows = (await sql`
-      select report from track_record_reports order by generated_at desc limit 1
-    `) as Array<{ report: TrackRecordSummary & Record<string, unknown> }>;
-    return rows[0]?.report ?? null;
-  } catch (cause) {
-    console.error("Suivi de performance indisponible", cause);
-    return null;
-  }
+  const sql = getSql();
+  const rows = (await sql`
+    select report from track_record_reports order by generated_at desc limit 1
+  `) as Array<{ report: TrackRecordSummary & Record<string, unknown> }>;
+  return rows[0]?.report ?? null;
 }
 
 /**
@@ -776,7 +785,7 @@ async function loadLatestTrackRecord(): Promise<(TrackRecordSummary & Record<str
  * (démonstration), pour une course sans gel, ou si la lecture échoue : la
  * comparaison enrichit la page, elle ne la conditionne pas.
  */
-export async function getFrozenPredictions(raceId: string): Promise<Array<import("@/lib/frozen-diff").FrozenStage>> {
+export async function getFrozenPredictions(raceId: string, options: ReadOptions = {}): Promise<Array<import("@/lib/frozen-diff").FrozenStage>> {
   if (!hasDatabase()) return [];
   try {
     const sql = getSql();
@@ -803,6 +812,7 @@ export async function getFrozenPredictions(raceId: string): Promise<Array<import
     }));
   } catch (cause) {
     console.error("Pronostics gelés indisponibles pour %s", raceId, cause);
+    if (options.strict) throw cause;
     return [];
   }
 }
@@ -901,7 +911,7 @@ export type DayRaceIndexItem = Pick<
   arrived: boolean;
 };
 
-export async function getDayRaceIndex(raceDate: string): Promise<DayRaceIndexItem[]> {
+export async function getDayRaceIndex(raceDate: string, options: ReadOptions = {}): Promise<DayRaceIndexItem[]> {
   if (!hasDatabase()) {
     return demoRaces
       .filter((race) => race.raceDate === raceDate)
@@ -967,6 +977,7 @@ export async function getDayRaceIndex(raceDate: string): Promise<DayRaceIndexIte
   } catch (cause) {
     // La navigation enrichit la page, elle ne la conditionne pas.
     console.error("Programme du jour indisponible pour %s", raceDate, cause);
+    if (options.strict) throw cause;
     return [];
   }
 }
@@ -979,7 +990,7 @@ export type RacePayout = { betType: string; combination: string; dividend: numbe
  * primaire. Liste vide tant que le PMU ne les a pas publiés, et en
  * démonstration : aucun rapport n'est inventé.
  */
-export async function getRacePayouts(raceId: string): Promise<RacePayout[]> {
+export async function getRacePayouts(raceId: string, options: ReadOptions = {}): Promise<RacePayout[]> {
   if (!hasDatabase()) return [];
   try {
     const sql = getSql();
@@ -992,6 +1003,7 @@ export async function getRacePayouts(raceId: string): Promise<RacePayout[]> {
     return rows.map((row) => ({ betType: row.bet_type, combination: row.combination, dividend: Number(row.dividend) }));
   } catch (cause) {
     console.error("Rapports indisponibles pour %s", raceId, cause);
+    if (options.strict) throw cause;
     return [];
   }
 }

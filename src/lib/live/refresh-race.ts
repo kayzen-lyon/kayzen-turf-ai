@@ -54,23 +54,25 @@ export function refreshIntervalSeconds(minutesToStart: number): number {
   return 2 * 60;
 }
 
+/** Statut PMU d'un cheval retiré. Le PMU le garde dans la liste des participants. */
+export const NON_RUNNER_STATUS = "NON_PARTANT";
+/** Au-delà de la moitié du peloton déclarée non partante, la réponse est tenue pour anormale. */
+const MAX_SCRATCH_SHARE = 0.5;
+
 /**
- * Numéros à retirer : présents en base mais absents des partants PMU.
+ * Numéros à retirer : présents en base ET déclarés non partants par le PMU.
  *
- * `listedNumbers` est la liste PMU complète, non-partants compris. C'est sur
- * elle, et non sur les seuls partants, qu'on juge une réponse tronquée (moins
- * de 70 % des chevaux connus) : comparer les partants seuls prenait les
- * forfaits d'un petit peloton pour une troncature — 6 chevaux dont 2 retirés
- * donnaient 4 < 4,2, et rien n'était jamais retiré. Sur une réponse tronquée,
- * seuls les non-partants déclarés comme tels sont retirés.
+ * L'absence d'un cheval dans la réponse ne vaut plus retrait (audit du
+ * 08/11/2026) : une réponse incomplète, un numéro manquant ou un statut
+ * inconnu supprimaient des partants et figeaient un pronostic H-60 ou H-15
+ * faux, sans retour possible. Le PMU garde les non-partants dans sa liste avec
+ * le statut NON_PARTANT (vérifié sur des retraits réels) : seul ce statut
+ * retire un cheval. Une déclaration en masse est ignorée.
  */
-export function planScratches(presentNumbers: number[], runningNumbers: number[], listedNumbers: number[] = runningNumbers): number[] {
-  const running = new Set(runningNumbers);
-  if (listedNumbers.length < presentNumbers.length * 0.7) {
-    const declared = new Set(listedNumbers.filter((n) => !running.has(n)));
-    return presentNumbers.filter((n) => declared.has(n));
-  }
-  return presentNumbers.filter((n) => !running.has(n));
+export function planScratches(presentNumbers: number[], declaredNonRunners: number[]): number[] {
+  const declared = new Set(declaredNonRunners.filter((n) => Number.isInteger(n) && n > 0));
+  const toRemove = presentNumbers.filter((n) => declared.has(n));
+  return toRemove.length > presentNumbers.length * MAX_SCRATCH_SHARE ? [] : toRemove;
 }
 
 type Citation = { typePari?: string; participants?: Array<{ numPmu: number | string; citations?: Array<{ ratio?: number }> }> };
@@ -99,11 +101,11 @@ export async function refreshRace(
   // des cotes « relevées à l'instant » qui n'ont pas été relues.
   const release = () => sql.query(`update races set odds_refreshed_at = $2 where id = $1`, [raceId, locked[0]!.previous]);
   let running: PmuParticipant[];
-  let listedNumbers: number[];
+  let declaredNonRunners: number[];
   try {
     const payload = await fetchPmuJson<{ participants?: PmuParticipant[] }>(participantsUrl);
     const listed = payload?.participants ?? [];
-    listedNumbers = listed.map((p) => Number(p.numPmu));
+    declaredNonRunners = listed.filter((p) => p.statut === NON_RUNNER_STATUS).map((p) => Number(p.numPmu));
     running = listed.filter((p) => !p.statut || p.statut === "PARTANT");
   } catch (error) {
     await release();
@@ -117,14 +119,14 @@ export async function refreshRace(
   // Une étape SQL qui échoue après la lecture PMU rend aussi le verrou : sinon
   // l'en-tête annoncerait des cotes « relevées à l'instant » jamais écrites.
   try {
-    return await applyRefresh(raceId, running, listedNumbers, minutesToStart);
+    return await applyRefresh(raceId, running, declaredNonRunners, minutesToStart);
   } catch (error) {
     await release().catch(() => undefined);
     throw error;
   }
 }
 
-async function applyRefresh(raceId: string, running: PmuParticipant[], listedNumbers: number[], minutesToStart: number): Promise<RefreshOutcome> {
+async function applyRefresh(raceId: string, running: PmuParticipant[], declaredNonRunners: number[], minutesToStart: number): Promise<RefreshOutcome> {
   const sql = getSql();
 
   // Les pools n'existent qu'une fois les paris ouverts : leur absence est normale.
@@ -149,9 +151,8 @@ async function applyRefresh(raceId: string, running: PmuParticipant[], listedNum
   // le peloton réduit à chaque lecture de la course, et le gel H-2 de ce même
   // passage — réécrit à chaque passage du dernier quart d'heure — porte donc
   // déjà le peloton réduit.
-  const runningNumbers = running.map((p) => Number(p.numPmu));
-  const present = (await sql.query(`select number from entries where race_id = $1`, [raceId])) as Array<{ number: number }>;
-  const toRemove = planScratches(present.map((r) => Number(r.number)), runningNumbers, listedNumbers);
+  const present =(await sql.query(`select number from entries where race_id = $1`, [raceId])) as Array<{ number: number }>;
+  const toRemove = planScratches(present.map((r) => Number(r.number)), declaredNonRunners);
   let scratched: number[] = [];
   let scratchedHorseIds: string[] = [];
   if (toRemove.length > 0) {

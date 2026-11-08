@@ -10,6 +10,16 @@ qu'un visiteur peut constater, vit dans `src/lib/changelog.ts` et s'affiche sur
 
 ## [Non publié]
 
+### Corrigé
+- Audit du 08/11/2026, pistes moyennes :
+  - Retraits de partants : seul le statut PMU `NON_PARTANT` retire un cheval (`planScratches`). Une réponse incomplète ou mal formée ne supprime plus de partants et ne fige plus de pronostic H-60 ou H-15 faux. Une déclaration en masse est ignorée.
+  - Arrivée : les résultats ne sont remplacés que si tous les chevaux de l'arrivée sont retrouvés, et une arrivée plus courte n'est acceptée que définitive.
+  - Import : une course en erreur est signalée et sautée. Elle ne bloque plus les suivantes, les autres jours ni les étapes du workflow.
+  - Courses terminées : une lecture Neon en échec n'est plus gardée un jour en cache (lectures strictes dans `loadSettled`). Le suivi de performance n'enregistre plus une panne comme « aucun rapport » pendant une heure.
+  - Route des mises : la lecture PMU est gardée 50 s par course quelle que soit l'URL, avec un limiteur de débit et un contrôle du format d'identifiant. Une lecture partielle ou en échec n'est jamais gardée une journée.
+  - `track_record.yml` : le backtest hebdomadaire tourne de nouveau le dimanche ; sa condition visait un cron jamais déclaré.
+- Mises en direct : les courses internationales, dont la masse `SIMPLE_GAGNANT_INTERNATIONAL` est commune au point de vente et en ligne, affichent cette masse au lieu d'un tableau vide.
+
 ### Sécurité
 - Audit du 08/11/2026 (méthode Cloudflare `security-audit`, rapport hors dépôt) : `next` 16.4.1 et `sharp` 0.35.5 (exécution de code à distance via l'optimisation d'images, GHSA-2464-fhr4-w9xw).
 - Quota Neon : les pages de course et leur image de partage sont enfin en rendu incrémental (`generateStaticParams` vide). `revalidate` seul ne créait aucun cache : chaque visite relisait la base. `/api/races/[id]/refresh` ne régénère plus la page que sur des données neuves.

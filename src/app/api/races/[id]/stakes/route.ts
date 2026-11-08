@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { getSql, hasDatabase } from "@/lib/db";
 import { fetchRaceStakes, loadStakeHistory, morningIsLive } from "@/lib/live/stakes";
 import { instantDepart } from "@/lib/paris-time";
+import { pmuPathFromRaceId } from "@/lib/pmu/client";
+import { adresseAppelant, limiterDebit, reponseTropDeRequetes } from "@/lib/rate-limit";
 import { buildStakeBoard } from "@/lib/stake-board";
 import { schemaIdCourse } from "@/lib/validation";
 
@@ -15,6 +17,12 @@ import { schemaIdCourse } from "@/lib/validation";
  * transfert a déjà suspendu le site en octobre 2026. L'heure de départ est
  * gardée une heure et l'historique quatre minutes, soit à peu près l'écart
  * entre deux relevés : le relire plus souvent ne ramènerait rien de neuf.
+ *
+ * Le CDN est indexé sur l'URL : un paramètre ajouté (« ?n=1 », « ?n=2 »…)
+ * contournait ce cache et relançait quatre appels au PMU à chaque requête
+ * (audit du 08/11/2026). La lecture PMU est donc aussi gardée 50 s côté
+ * serveur, par course, quelle que soit l'URL. Une lecture partielle ou en
+ * échec n'est jamais gardée une journée.
  */
 
 export const dynamic = "force-dynamic";
@@ -37,13 +45,18 @@ const loadHistoryCached = unstable_cache(
   { revalidate: 240 },
 );
 
+const loadStakesCached = unstable_cache(fetchRaceStakes, ["stakes-pmu"], { revalidate: 50 });
+
 const NO_STORE = { "Cache-Control": "no-store" };
 const LIVE_CACHE = { "Cache-Control": "public, max-age=0, s-maxage=55, stale-while-revalidate=5" };
 const FINAL_CACHE = { "Cache-Control": "public, max-age=300, s-maxage=86400" };
 /** Passé ce délai après le départ, les enjeux ne bougent plus. */
 const SETTLED_AFTER_MIN = 30;
 
-export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  // Seules les requêtes qui manquent le CDN arrivent ici : une par minute et par onglet suffit largement.
+  const limite = limiterDebit(`stakes:${adresseAppelant(request)}`, 20, 60_000);
+  if (!limite.autorise) return reponseTropDeRequetes(limite);
   let id: string;
   try {
     id = decodeURIComponent((await params).id);
@@ -51,7 +64,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Identifiant de course invalide" }, { status: 400, headers: NO_STORE });
   }
   const parsed = schemaIdCourse.safeParse(id);
-  if (!parsed.success) return NextResponse.json({ error: "Identifiant de course invalide" }, { status: 400, headers: NO_STORE });
+  // Format réel (date, réunion, course) : un identifiant inventé n'atteint ni la base ni le cache.
+  if (!parsed.success || !pmuPathFromRaceId(parsed.data)) return NextResponse.json({ error: "Identifiant de course invalide" }, { status: 400, headers: NO_STORE });
   // Mode démonstration : pas de mises réelles à montrer, et ce n'est pas une panne.
   if (!hasDatabase()) return NextResponse.json({ board: null, updatedAt: null }, { headers: NO_STORE });
 
@@ -64,9 +78,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     const now = new Date();
     const minutesToStart = depart ? (depart.getTime() - now.getTime()) / 60_000 : NaN;
     const settled = minutesToStart < -SETTLED_AFTER_MIN;
-    const headers = settled ? FINAL_CACHE : LIVE_CACHE;
-
-    const live = await fetchRaceStakes(raceId);
+    const live = await loadStakesCached(raceId);
+    const headers = settled && !live?.partial ? FINAL_CACHE : LIVE_CACHE;
     if (!live) return NextResponse.json({ board: null, updatedAt: null }, { headers });
 
     // Après le départ, la fenêtre reste celle des dernières minutes de paris.
@@ -81,7 +94,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       },
       morning: morning ?? (morningIsLive(minutesToStart) ? live.morning : null),
     });
-    return NextResponse.json({ board, updatedAt: live.updatedAt }, { headers });
+    return NextResponse.json({ board, updatedAt: live.updatedAt, international: live.international }, { headers });
   } catch (cause) {
     console.error("GET /api/races/%s/stakes", raceId, cause instanceof Error ? cause.message : cause);
     return NextResponse.json({ error: "Le PMU ne répond pas." }, { status: 502, headers: NO_STORE });

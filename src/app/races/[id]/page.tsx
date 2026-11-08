@@ -44,7 +44,11 @@ export function generateStaticParams() {
  * chaque visite paie deux fois la requête base. React déduplique l'appel sur la
  * durée d'un rendu.
  */
-const loadRace = cache((id: string | null) => (id && isSettled(id) ? loadSettled(id).then((data) => data?.race ?? null) : getRaceById(id)));
+const loadRace = cache(async (id: string | null) => {
+  if (!id || !isSettled(id)) return getRaceById(id);
+  const settled = await loadSettledSafe(id);
+  return settled === undefined ? getRaceById(id) : (settled?.race ?? null);
+});
 
 /**
  * Course d'avant-hier ou plus ancienne : arrivée, rapports et cotes ne bougent
@@ -63,17 +67,31 @@ const loadSettled = unstable_cache(
     const race = await getRaceById(id);
     if (!race) return null;
     const arrived = officialArrival(race).length > 0;
+    // Lectures strictes : un échec lève et n'est pas gardé un jour en cache.
     const [history, dayIndex, payouts, stages] = await Promise.all([
-      getRaceMarketHistory(race.id),
-      getDayRaceIndex(race.raceDate),
-      arrived ? getRacePayouts(race.id) : Promise.resolve([]),
-      getFrozenPredictions(race.id),
+      getRaceMarketHistory(race.id, { strict: true }),
+      getDayRaceIndex(race.raceDate, { strict: true }),
+      arrived ? getRacePayouts(race.id, { strict: true }) : Promise.resolve([]),
+      getFrozenPredictions(race.id, { strict: true }),
     ]);
     return { race, history, dayIndex, payouts, stages };
   },
   ["race-page-settled"],
   { revalidate: 86_400 },
 );
+
+/**
+ * Lecture de la course terminée, `undefined` si une lecture a échoué : la page
+ * repasse alors par les lectures directes, sans rien garder en cache.
+ */
+const loadSettledSafe = cache(async (id: string) => {
+  try {
+    return await loadSettled(id);
+  } catch (cause) {
+    console.error("Course terminée %s : lecture incomplète, rien n'est gardé en cache", id, cause);
+    return undefined;
+  }
+});
 
 const dateLongue = new Intl.DateTimeFormat("fr-FR", {
   day: "numeric",
@@ -180,7 +198,7 @@ export default async function RacePage({ params }: RacePageProps) {
   // Navigation du jour : une requête légère sur `races`, sans partants.
   // Rapports : lus seulement une fois l'arrivée publiée.
   const arrived = officialArrival(race).length > 0;
-  const settled = isSettled(race.id) ? await loadSettled(race.id) : null;
+  const settled = isSettled(race.id) ? ((await loadSettledSafe(race.id)) ?? null) : null;
   const [history, trackRecord, dayIndex, payouts] = await Promise.all([
     settled ? settled.history : getRaceMarketHistory(race.id),
     getLatestTrackRecord(),
@@ -233,7 +251,8 @@ export default async function RacePage({ params }: RacePageProps) {
 
 /** Ce que l'IA a changé entre H-60 et le départ — rien tant qu'il n'y a pas deux pronostics gelés. */
 async function FrozenSlot({ raceId, horseNames }: { raceId: string; horseNames: Record<number, string> }) {
-  const stages = isSettled(raceId) ? ((await loadSettled(raceId))?.stages ?? []) : await getFrozenPredictions(raceId);
+  const settled = isSettled(raceId) ? await loadSettledSafe(raceId) : undefined;
+  const stages = settled ? settled.stages : await getFrozenPredictions(raceId);
   if (stages.length < 2) return null;
   return <FrozenDiffPanel horseNames={horseNames} stages={stages} />;
 }

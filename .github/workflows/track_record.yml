@@ -50,9 +50,18 @@ jobs:
         run: node scripts/backfill-payouts.mjs --from 2026-04-01 --limit 400
 
       - name: Backtest and live tracking
-        if: ${{ github.event_name != 'schedule' || github.event.schedule == '15 23 * * 0' }}
         # Les tickets du site sont reconstitués course par course avec le code
         # de production. Le chargement du jeu historique complet consomme du
-        # transfert Neon : exécution hebdomadaire plutôt que quotidienne.
+        # transfert Neon : exécution hebdomadaire (dimanche) plutôt que
+        # quotidienne, ou à la demande. La condition testait un cron du
+        # dimanche que le workflow ne déclare pas : le rapport n'était plus
+        # jamais régénéré par le planning (audit du 08/11/2026).
         timeout-minutes: 30
-        run: npx tsx scripts/backtest.ts
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT_NAME" = "schedule" ] && [ "$(date -u +%u)" != "7" ]; then
+            echo "Backtest hebdomadaire : uniquement le dimanche."
+            exit 0
+          fi
+          npx tsx scripts/backtest.ts

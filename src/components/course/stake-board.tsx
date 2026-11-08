@@ -29,7 +29,7 @@ const STANCE_STYLES: Record<Stance, string> = {
   marche: "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200",
 };
 
-type Payload = { board: Board | null; updatedAt: string | null };
+type Payload = { board: Board | null; updatedAt: string | null; international?: boolean };
 
 function useStakeBoard(raceId: string, departAt: number | null) {
   const [data, setData] = useState<Payload | null>(null);
@@ -131,6 +131,12 @@ export function StakeBoardPanel({ race, vm, onSelect, signals }: {
           </div>
         ) : null}
       </div>
+
+      {data?.international && runners.length > 0 ? (
+        <p className="border-b border-border bg-surface-sub px-5 py-2 text-xs text-muted">
+          Course internationale : le PMU met en commun les paris en point de vente et en ligne. Les mises et les cotes affichées sous PMU+ sont celles de cette masse commune ; il n&apos;existe pas de chiffres séparés pour PMU Play.
+        </p>
+      ) : null}
 
       {runners.length === 0 ? (
         <p className="p-5 text-sm text-muted" role="status">
