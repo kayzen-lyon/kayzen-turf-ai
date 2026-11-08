@@ -22,6 +22,23 @@ export type EntreeChangelog = {
 
 export const CHANGELOG: readonly EntreeChangelog[] = [
   {
+    date: "2026-11-08",
+    titre: "Pronostics de la presse × IA",
+    changements: [
+      {
+        categorie: "Modifié",
+        elements: [
+          "Page course : les pronostics de la presse s'affichent d'emblée en tableau, avec le rang donné par chaque site, le total des citations, le classement presse et la chance de victoire selon l'IA.",
+          "Trois encadrés : le Top 3 de la presse, le Top 3 de l'IA, et le cheval peu cité que l'IA place pourtant parmi ses quatre premiers.",
+        ],
+      },
+      {
+        categorie: "Sécurité",
+        elements: ["Mise à jour de sécurité du moteur du site, et protections supplémentaires contre les lectures excessives de la base."],
+      },
+    ],
+  },
+  {
     date: "2026-11-06",
     titre: "Mises en direct PMU+ / PMU Play × Force IA",
     changements: [
