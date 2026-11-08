@@ -59,6 +59,22 @@ export const schemaDate = z
     "Date hors de la période couverte",
   );
 
+/** Recul accepté par les routes qui chargent une journée entière. */
+const JOURS_RECUL_MAX = 7;
+
+/**
+ * Date d'une journée chargée en entier (/api/races, PDF du jour) : la semaine
+ * passée et la semaine à venir. Avec tout l'historique depuis 2024, un client
+ * respectant la limite de requêtes pouvait relire jour après jour des
+ * mégaoctets de partants et épuiser le quota de transfert Neon (audit du
+ * 08/11/2026). Les courses plus anciennes restent consultables page par page.
+ */
+export const schemaDateRecente = schemaDate.refine((valeur) => {
+  const [annee, mois, jour] = aujourdhuiParis().split("-").map(Number);
+  const minimum = new Date(Date.UTC(annee!, mois! - 1, jour! - JOURS_RECUL_MAX)).toISOString().slice(0, 10);
+  return valeur >= minimum;
+}, `Date antérieure aux ${JOURS_RECUL_MAX} derniers jours`);
+
 /** Jour relatif accepté par le dépôt de courses. */
 export const schemaJourRelatif = z.enum(["yesterday", "today", "tomorrow"]);
 

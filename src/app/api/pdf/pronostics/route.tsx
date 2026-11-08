@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { getRaces } from "@/lib/race-repository";
 import { PronosticsPDF } from "@/lib/pronostics-pdf";
 import { adresseAppelant, limiterDebit, reponseTropDeRequetes } from "@/lib/rate-limit";
-import { lireParametreOptionnel, reponseParametreInvalide, schemaDate } from "@/lib/validation";
+import { lireParametreOptionnel, reponseParametreInvalide, schemaDateRecente } from "@/lib/validation";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -33,7 +33,7 @@ export async function GET(request: Request) {
 
   // `date` finissait dans un cast `::date` SQL et dans l'en-tête
   // `Content-Disposition`, sans le moindre contrôle.
-  const date = lireParametreOptionnel(schemaDate, searchParams.get("date"));
+  const date = lireParametreOptionnel(schemaDateRecente, searchParams.get("date"));
   if (!date.ok) return reponseParametreInvalide("date", date.message);
 
   const jour = date.valeur ?? parisToday();

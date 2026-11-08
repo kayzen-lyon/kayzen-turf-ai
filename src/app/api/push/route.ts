@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { getSql, hasDatabase } from "@/lib/db";
-import { isPushService, MAX_FOLLOWED_HORSES } from "@/lib/push/config";
+import { isPushService, isValidPushKeys, MAX_FOLLOWED_HORSES } from "@/lib/push/config";
 import { adresseAppelant, limiterDebit, reponseTropDeRequetes } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
@@ -25,10 +25,12 @@ const endpointSchema = z.string().max(1_000).refine(isPushService, "Service de p
 const subscribeSchema = z.object({
   subscription: z.object({
     endpoint: endpointSchema,
-    keys: z.object({
-      p256dh: z.string().min(16).max(200),
-      auth: z.string().min(8).max(100),
-    }),
+    keys: z
+      .object({
+        p256dh: z.string().min(16).max(200),
+        auth: z.string().min(8).max(100),
+      })
+      .refine((k) => isValidPushKeys(k.p256dh, k.auth), "Clés d'abonnement invalides"),
   }),
   horseIds: z.array(z.string().regex(/^[a-z0-9][a-z0-9-]{0,79}$/)).max(MAX_FOLLOWED_HORSES),
 });

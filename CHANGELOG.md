@@ -10,6 +10,12 @@ qu'un visiteur peut constater, vit dans `src/lib/changelog.ts` et s'affiche sur
 
 ## [Non publié]
 
+### Sécurité
+- Audit du 08/11/2026 (méthode Cloudflare `security-audit`, rapport hors dépôt) : `next` 16.4.1 et `sharp` 0.35.5 (exécution de code à distance via l'optimisation d'images, GHSA-2464-fhr4-w9xw).
+- Quota Neon : les pages de course et leur image de partage sont enfin en rendu incrémental (`generateStaticParams` vide). `revalidate` seul ne créait aucun cache : chaque visite relisait la base. `/api/races/[id]/refresh` ne régénère plus la page que sur des données neuves.
+- Quota Neon : `/api/races` et le PDF du jour n'acceptent plus que les 7 derniers jours et les 7 suivants (`schemaDateRecente`). Le programme est mis en cache jour par jour, sous la limite de 2 Mo par entrée de `unstable_cache`.
+- Alertes push : clés d'abonnement validées (`isValidPushKeys`). Un abonnement aux clés invalides est supprimé au lieu d'être retenté à chaque passage de la boucle.
+
 ### Ajouté
 - Mises en direct PMU+ / PMU Play × Force IA (`src/lib/stake-board.ts`, `src/lib/live/stakes.ts`, `src/components/course/stake-board.tsx`, `GET /api/races/[id]/stakes`) : enjeux par cheval des masses `SIMPLE_GAGNANT` et `E_SIMPLE_GAGNANT` (endpoint PMU `combinaisons`), cotes des deux masses, historique espacé dans `stake_snapshots`, cache CDN d'une minute. Cote du matin figée avant le recalage PMU de H-30. Note de force sur 100 tirée du modèle fondamental, sans cote.
 - Pronostiqueurs × Marché (`src/lib/press-consensus.ts`, `src/components/course/press-panel.tsx`) : sélections des sites de pronostics (table `press_selections`, `scripts/import-press.mjs`) comparées au marché ; trois catégories, deux alertes, degré d'accord ; signaux `presse-*` au backtest, sélections relevées avant la cote de décision seulement.

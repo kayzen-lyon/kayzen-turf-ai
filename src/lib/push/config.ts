@@ -28,6 +28,27 @@ const PUSH_HOSTS = [
   "notify.windows.com",
 ];
 
+/** Octets décodés d'une chaîne base64url, sans `Buffer` (ce module est aussi chargé par le navigateur). */
+function base64UrlBytes(value: string): number | null {
+  if (!/^[A-Za-z0-9_-]+={0,2}$/.test(value)) return null;
+  const chars = value.replace(/=+$/, "").length;
+  return chars % 4 === 1 ? null : Math.floor((chars * 3) / 4);
+}
+
+/**
+ * Clés d'abonnement utilisables par web-push : point P-256 non compressé
+ * (65 octets, préfixe 0x04) et secret d'au moins 16 octets. Une clé mal
+ * formée faisait échouer l'envoi avant tout appel réseau ; l'échec passait
+ * pour une panne passagère et l'alerte était retentée à chaque passage de la
+ * boucle, sans fin (audit du 08/11/2026).
+ */
+export function isValidPushKeys(p256dh: string, auth: string): boolean {
+  if (base64UrlBytes(p256dh) !== 65 || (base64UrlBytes(auth) ?? 0) < 16) return false;
+  // Premier octet 0x04 : le premier caractère vaut 1 (« B ») et les deux bits
+  // hauts du second sont nuls (« A » à « P »).
+  return p256dh[0] === "B" && /^[A-P]$/.test(p256dh[1] ?? "");
+}
+
 export function isPushService(endpoint: string): boolean {
   try {
     const url = new URL(endpoint);

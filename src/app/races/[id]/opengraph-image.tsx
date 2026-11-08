@@ -17,6 +17,12 @@ export const contentType = "image/png";
 // pour une image de partage.
 export const revalidate = 3600;
 
+// Sans cette liste, même vide, la route est rendue à chaque appel malgré
+// `revalidate` (voir la page de course).
+export function generateStaticParams() {
+  return [];
+}
+
 function safeDecode(value: string) {
   try {
     return decodeURIComponent(value);

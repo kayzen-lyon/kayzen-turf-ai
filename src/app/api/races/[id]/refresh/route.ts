@@ -42,9 +42,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: "Identifiant de course invalide" }, { status: 400, headers: NO_STORE });
   }
   const parsed = schemaIdCourse.safeParse(id);
-  // Relecture automatique de la page (toutes les cinq minutes dans les dix dernières) ou clic.
-  const body = (await request.json().catch(() => ({}))) as { auto?: unknown };
-  const auto = body?.auto === true;
+  // Le corps `{ auto }` envoyé par la page n'est plus lu : clic ou relecture
+  // automatique, la page n'est régénérée que sur des données neuves.
   if (!parsed.success) return NextResponse.json({ error: "Identifiant de course invalide" }, { status: 400, headers: NO_STORE });
   if (!hasDatabase()) return NextResponse.json({ error: "Données indisponibles" }, { status: 503, headers: NO_STORE });
 
@@ -65,13 +64,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   try {
     const outcome = await refreshRace(raceId, { minutesToStart });
-    // Régénérer la page si le PMU a été relu. Sur un clic, aussi quand il
-    // venait de l'être par quelqu'un d'autre (la page en cache peut avoir une
-    // minute de retard), mais au plus une fois toutes les 15 s par course.
-    // Les relectures automatiques ne régénèrent que sur des données neuves :
-    // sinon chaque onglet ouvert forçait un rendu complet par minute.
+    // Régénérer la page seulement quand le PMU vient d'être relu. Un clic sur
+    // une course relue par quelqu'un d'autre régénérait aussi la page : depuis
+    // que la page est vraiment en cache, ce chemin permettait à n'importe qui
+    // de forcer des rendus complets, donc des lectures Neon. Le verrou en base
+    // borne déjà les relectures à la cadence partagée.
     const now = Date.now();
-    if (outcome.status === "refreshed" || (!auto && now - (lastRevalidation.get(raceId) ?? 0) > REVALIDATE_GAP_MS)) {
+    if (outcome.status === "refreshed" && now - (lastRevalidation.get(raceId) ?? 0) > REVALIDATE_GAP_MS) {
       lastRevalidation.set(raceId, now);
       if (lastRevalidation.size > 500) lastRevalidation.clear();
       revalidatePath(`/races/${raceId}`);

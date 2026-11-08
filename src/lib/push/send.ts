@@ -3,7 +3,7 @@ import { getSql } from "@/lib/db";
 import type { FrozenPayload } from "@/lib/live/freeze";
 import { PROFILE_LABELS } from "@/lib/profiles";
 import type { PoolSnapshot } from "@/lib/market";
-import { DEPART_ALERT_MINUTES, VAPID_PUBLIC_KEY } from "@/lib/push/config";
+import { DEPART_ALERT_MINUTES, isValidPushKeys, VAPID_PUBLIC_KEY } from "@/lib/push/config";
 import { arrivalBody, evaluateMarketAlert, type AlertKind, type ArrivalSummary, type MarketAlertKind } from "@/lib/push/market-alerts";
 import { SITE_URL } from "@/lib/site";
 
@@ -95,6 +95,13 @@ export function scratchNotification(t: Target): Notification {
  */
 async function deliver(t: Target, kind: AlertKind, notification: Notification, ttlSeconds?: number): Promise<boolean> {
   const sql = getSql();
+  // Abonnement enregistré avant la validation des clés : il ne pourra jamais
+  // être livré. Supprimé une fois pour toutes, au lieu d'être retenté à
+  // chaque passage.
+  if (!isValidPushKeys(t.p256dh, t.auth)) {
+    await sql.query(`delete from push_subscriptions where id = $1`, [t.subscription_id]).catch(() => undefined);
+    return false;
+  }
   let reserved: unknown[];
   try {
     reserved = (await sql.query(

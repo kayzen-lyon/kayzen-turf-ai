@@ -138,18 +138,29 @@ function specialtyLabel(specialty: string | null, discipline: string): string {
  * course relit toujours ses propres cotes. La date de Paris entre dans la clé
  * pour qu'« aujourd'hui » ne serve pas la veille après minuit.
  */
-const loadRacesCached = unstable_cache(
-  async (date: string | null, day: string | null, parisDate: string | null) => {
+//
+// Une entrée par JOUR, pas une pour les trois jours : Next n'enregistre pas une
+// entrée de plus de 2 Mo (simple avertissement), et le programme de trois
+// jours la dépassait probablement les jours chargés — le cache ne stockait
+// alors rien et chaque rendu relisait tout (audit du 08/11/2026). La clé ne
+// dépend que de la date réelle : `day=today` et `date=<aujourd'hui>` partagent
+// la même entrée.
+const loadDayCached = unstable_cache(
+  async (date: string, parisDate: string | null) => {
     void parisDate; // n'influe que sur la clé de cache
-    return loadRaces({ date, day });
+    return loadRaces({ date });
   },
-  ["races-programme"],
+  ["races-programme-jour"],
   { revalidate: 600 },
 );
 
 export async function getRaces(filters?: { date?: string | null; day?: string | null }) {
   if (!hasDatabase()) return loadRaces(filters);
-  return loadRacesCached(filters?.date ?? null, filters?.day ?? null, dateForRelativeDay("today"));
+  const today = dateForRelativeDay("today");
+  const date = filters?.date ?? (filters?.day ? dateForRelativeDay(filters.day) : null);
+  if (date) return loadDayCached(date, today);
+  const days = ["yesterday", "today", "tomorrow"].map(dateForRelativeDay).filter((d): d is string => Boolean(d));
+  return (await Promise.all(days.map((d) => loadDayCached(d, today)))).flat();
 }
 
 async function loadRaces(filters?: { date?: string | null; day?: string | null }) {

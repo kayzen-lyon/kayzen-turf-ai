@@ -27,8 +27,17 @@ type RacePageProps = {
  *
  * `dynamicParams` reste implicite à `true` : une course publiée après le
  * dernier build doit être rendue à la demande, pas répondre 404.
+ *
+ * `revalidate` seul ne suffit pas : sur une route dynamique sans
+ * `generateStaticParams`, Next rend chaque visite (audit du 08/11/2026, aucune
+ * entrée /races dans le manifeste de prérendu). La liste vide n'ajoute rien au
+ * build ; elle active le rendu incrémental à la demande, page par page.
  */
 export const revalidate = 300;
+
+export function generateStaticParams() {
+  return [];
+}
 
 /**
  * `generateMetadata` et le rendu de page demandent la même course. Sans `cache`,

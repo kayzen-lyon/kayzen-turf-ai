@@ -4,7 +4,7 @@ import { adresseAppelant, limiterDebit, reponseTropDeRequetes } from "@/lib/rate
 import {
   lireParametreOptionnel,
   reponseParametreInvalide,
-  schemaDate,
+  schemaDateRecente,
   schemaJourRelatif,
 } from "@/lib/validation";
 
@@ -17,7 +17,7 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
 
-  const date = lireParametreOptionnel(schemaDate, searchParams.get("date"));
+  const date = lireParametreOptionnel(schemaDateRecente, searchParams.get("date"));
   if (!date.ok) return reponseParametreInvalide("date", date.message);
 
   const jour = lireParametreOptionnel(schemaJourRelatif, searchParams.get("day"));

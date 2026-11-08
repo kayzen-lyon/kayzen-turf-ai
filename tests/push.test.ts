@@ -1,6 +1,6 @@
-import { test } from "node:test";
+import { describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { isPushService } from "@/lib/push/config";
+import { isPushService, isValidPushKeys, VAPID_PUBLIC_KEY } from "@/lib/push/config";
 import { departNotification, scratchNotification, type Target } from "@/lib/push/send";
 
 test("abonnement push : seuls les services des navigateurs sont acceptés", () => {
@@ -62,4 +62,23 @@ test("alerte de non-partant", () => {
   const n = scratchNotification(target);
   assert.equal(n.title, "IDAO DE TILLARD est non-partant");
   assert.equal(n.body, "N° 7 retiré de la R1C4 VINCENNES (départ 15:15).");
+});
+
+describe("isValidPushKeys", () => {
+  // Clés produites par un vrai navigateur : point P-256 de 65 octets, secret de 16.
+  const p256dh = Buffer.concat([Buffer.from([4]), Buffer.alloc(64, 7)]).toString("base64url");
+  const auth = Buffer.alloc(16, 9).toString("base64url");
+
+  test("accepte des clés de navigateur", () => {
+    assert.equal(isValidPushKeys(p256dh, auth), true);
+    assert.equal(isValidPushKeys(VAPID_PUBLIC_KEY, auth), true, "la clé VAPID publique a le même format");
+  });
+
+  test("refuse les clés que web-push rejetterait avant tout envoi", () => {
+    assert.equal(isValidPushKeys("A".repeat(16), auth), false, "p256dh trop court");
+    assert.equal(isValidPushKeys(p256dh, "A".repeat(8)), false, "auth de 6 octets");
+    const compressed = Buffer.concat([Buffer.from([2]), Buffer.alloc(64, 7)]).toString("base64url");
+    assert.equal(isValidPushKeys(compressed, auth), false, "point sans préfixe 0x04");
+    assert.equal(isValidPushKeys(`${p256dh.slice(0, -1)}!`, auth), false, "caractère hors base64url");
+  });
 });
