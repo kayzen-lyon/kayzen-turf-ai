@@ -64,10 +64,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: "Identifiant de course invalide" }, { status: 400, headers: NO_STORE });
   }
   const parsed = schemaIdCourse.safeParse(id);
-  // Format réel (date, réunion, course) : un identifiant inventé n'atteint ni la base ni le cache.
-  if (!parsed.success || !pmuPathFromRaceId(parsed.data)) return NextResponse.json({ error: "Identifiant de course invalide" }, { status: 400, headers: NO_STORE });
-  // Mode démonstration : pas de mises réelles à montrer, et ce n'est pas une panne.
+  if (!parsed.success) return NextResponse.json({ error: "Identifiant de course invalide" }, { status: 400, headers: NO_STORE });
+  // Mode démonstration : pas de mises réelles à montrer, et ce n'est pas une panne
+  // (les identifiants de démonstration n'ont pas le format PMU).
   if (!hasDatabase()) return NextResponse.json({ board: null, updatedAt: null }, { headers: NO_STORE });
+  // Format réel (date, réunion, course) : un identifiant inventé n'atteint ni la base ni le cache.
+  if (!pmuPathFromRaceId(parsed.data)) return NextResponse.json({ error: "Identifiant de course invalide" }, { status: 400, headers: NO_STORE });
 
   const raceId = parsed.data;
   try {

@@ -41,7 +41,12 @@ function useStakeBoard(raceId: string, departAt: number | null) {
     const load = async () => {
       try {
         const response = await fetch(url, { signal: controller.signal });
-        if (!response.ok) throw new Error(String(response.status));
+        if (!response.ok) {
+          // Corps lu même en erreur : non lu, la requête restait ouverte et le
+          // réseau de la page ne se calmait jamais (test d'accessibilité en CI).
+          await response.body?.cancel().catch(() => undefined);
+          throw new Error(String(response.status));
+        }
         setData((await response.json()) as Payload);
         setFailed(false);
       } catch {
