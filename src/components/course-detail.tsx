@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AlertTriangle, ArrowLeft } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Timer } from "lucide-react";
 import { AllOddsChart } from "@/components/course/all-odds-chart";
 import { AnalysisReport } from "@/components/course/analysis-report";
 import { ArrivalRecap } from "@/components/course/arrival-recap";
@@ -175,6 +175,12 @@ export function CourseDetail({ race, history = EMPTY_HISTORY, signals = NO_SIGNA
           <span className="text-sm text-muted">R{race.reunionNumber} — {properName(race.racecourse)}</span>
           <span aria-hidden="true" className="text-muted/40">/</span>
           <span className="text-sm font-semibold text-fg">{race.programCode} — {properName(race.name)}</span>
+          <Link
+            className="inline-flex items-center gap-1.5 rounded-xl border border-accent/40 bg-accent-lo px-3.5 py-2 text-sm font-semibold text-accent-text shadow-sm transition hover:border-accent sm:ml-auto"
+            href={`/races/${encodeURIComponent(race.id)}/forme`}
+          >
+            <Timer aria-hidden="true" size={14} /> Chronos, poids et forme
+          </Link>
         </nav>
 
         <CourseHeader

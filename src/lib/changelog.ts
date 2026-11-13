@@ -22,6 +22,25 @@ export type EntreeChangelog = {
 
 export const CHANGELOG: readonly EntreeChangelog[] = [
   {
+    date: "2026-11-13",
+    titre: "Chronos, poids et forme — et la presse sur toutes les courses",
+    changements: [
+      {
+        categorie: "Ajouté",
+        elements: [
+          "Nouvelle page « Chronos, poids et forme », accessible depuis chaque course : les partants classés du plus rapide au moins rapide sur la distance du jour, avec la date, l'hippodrome et le terrain du chrono.",
+          "Comparaison du poids porté aujourd'hui avec celui des dernières courses (plat et obstacle), et indicateur de forme — bonne, moyenne ou mauvaise — calculé sur les cinq dernières courses, au plat, au trot et en obstacle.",
+        ],
+      },
+      {
+        categorie: "Corrigé",
+        elements: [
+          "Les pronostics de la presse manquaient sur les courses du matin et du début d'après-midi : ils sont maintenant relevés tout au long de la journée, et dès la veille au soir pour le lendemain.",
+        ],
+      },
+    ],
+  },
+  {
     date: "2026-11-08",
     titre: "Pronostics de la presse × IA",
     changements: [

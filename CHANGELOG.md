@@ -11,6 +11,7 @@ qu'un visiteur peut constater, vit dans `src/lib/changelog.ts` et s'affiche sur
 ## [Non publié]
 
 ### Corrigé
+- Pronostics de la presse absents sur les courses du matin : la collecte ne tournait qu'avec l'import PMU, que GitHub déclenche avec des heures de retard (13 h 28 au lieu de 05 h 30 le 13/11/2026), et seules les courses pas encore parties sont écrites. La boucle en direct (`scripts/live-refresh.ts`) lance désormais elle-même une passe presse en tâche de fond, au démarrage puis toutes les 2 h 30 entre 6 h et minuit (Paris), et relève aussi le lendemain à partir de 18 h (`scripts/lib/press-sources/schedule.mjs`). `import-press.mjs --missing-only` ne redemande à un site que les courses qu'il n'a pas encore couvertes ; `--tomorrow` vise le lendemain.
 - Audit du 08/11/2026, pistes moyennes :
   - Retraits de partants : seul le statut PMU `NON_PARTANT` retire un cheval (`planScratches`). Une réponse incomplète ou mal formée ne supprime plus de partants et ne fige plus de pronostic H-60 ou H-15 faux. Une déclaration en masse est ignorée.
   - Arrivée : les résultats ne sont remplacés que si tous les chevaux de l'arrivée sont retrouvés, et une arrivée plus courte n'est acceptée que définitive.
@@ -27,6 +28,7 @@ qu'un visiteur peut constater, vit dans `src/lib/changelog.ts` et s'affiche sur
 - Alertes push : clés d'abonnement validées (`isValidPushKeys`). Un abonnement aux clés invalides est supprimé au lieu d'être retenté à chaque passage de la boucle.
 
 ### Ajouté
+- Page « Chronos, poids et forme » par course (`/races/[id]/forme`, lien depuis la page course) : partants classés du meilleur chrono au kilomètre au moins bon sur la distance du jour (même spécialité, à 100 m près en plat, 200 m au trot, 300 m en obstacle), avec date, hippodrome, terrain et place ; comparaison du poids du jour à la moyenne des trois dernières courses (plat et obstacle) ; indicateur de forme sur 100 (résultats 40, progression 20, régularité 20, fraîcheur 20 ; bonne forme dès 70, moyenne dès 45). Source : les cinq dernières courses publiées par l'API PMU (`performances-detaillees`, `src/lib/performances/pmu-performances.ts`), gardées une heure en cache. Règles dans `src/lib/performances/form-board.ts`. Ce sont des règles fixes, non mesurées au backtest : la page le dit.
 - Mises en direct PMU+ / PMU Play × Force IA (`src/lib/stake-board.ts`, `src/lib/live/stakes.ts`, `src/components/course/stake-board.tsx`, `GET /api/races/[id]/stakes`) : enjeux par cheval des masses `SIMPLE_GAGNANT` et `E_SIMPLE_GAGNANT` (endpoint PMU `combinaisons`), cotes des deux masses, historique espacé dans `stake_snapshots`, cache CDN d'une minute. Cote du matin figée avant le recalage PMU de H-30. Note de force sur 100 tirée du modèle fondamental, sans cote.
 - Pronostiqueurs × Marché (`src/lib/press-consensus.ts`, `src/components/course/press-panel.tsx`) : sélections des sites de pronostics (table `press_selections`, `scripts/import-press.mjs`) comparées au marché ; trois catégories, deux alertes, degré d'accord ; signaux `presse-*` au backtest, sélections relevées avant la cote de décision seulement.
 
