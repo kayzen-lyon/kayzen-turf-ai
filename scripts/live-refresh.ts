@@ -27,10 +27,12 @@
  * Usage : npx tsx scripts/live-refresh.ts [--minutes 330] [--once]
  */
 
+import { spawn } from "node:child_process";
 import { appendFileSync, readFileSync } from "node:fs";
 import { imminentRaces, minutesToNextRace, refreshRace } from "@/lib/live/refresh-race";
 import { delay } from "@/lib/pmu/client";
 import { purgeStaleSubscriptions, pushConfigured, sendPushAlerts } from "@/lib/push/send";
+import { PRESS_PASS_MARGIN_MS, pressPassPlan } from "./lib/press-sources/schedule.mjs";
 
 function loadLocalEnv() {
   try {
@@ -89,6 +91,49 @@ async function pass() {
   return closest;
 }
 
+/**
+ * SÉLECTIONS PRESSE
+ *
+ * La collecte presse ne tournait qu'avec l'import PMU, que GitHub déclenche avec
+ * des heures de retard (13 h 28 au lieu de 05 h 30 le 13/11/2026) : les courses
+ * du matin restaient sans pronostic presse. La boucle lance donc elle-même une
+ * passe au démarrage puis toutes les 2 h 30 (scripts/lib/press-sources/schedule.mjs).
+ *
+ * La passe tourne dans un processus séparé, jamais attendue par la boucle : elle
+ * dure plusieurs minutes (1,5 s entre deux requêtes par site) et ne doit pas
+ * retarder les cotes. `--missing-only` : un site n'est redemandé que pour les
+ * courses qu'il n'a pas encore couvertes.
+ */
+let pressPass: Promise<void> | null = null;
+let lastPressPassAt: number | null = null;
+
+function runPressImport(extraArgs: string[]): Promise<void> {
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, ["scripts/import-press.mjs", "--missing-only", ...extraArgs], { stdio: "inherit" });
+    // Une passe presse en échec ne doit jamais arrêter la boucle des cotes.
+    child.on("error", (error) => {
+      console.warn(`[presse] passe non lancée : ${error.message}`);
+      resolve();
+    });
+    child.on("close", () => resolve());
+  });
+}
+
+function maybeStartPressPass(deadline: number) {
+  if (pressPass) return;
+  const now = Date.now();
+  const plan = pressPassPlan({ now, lastPassAt: lastPressPassAt, deadline });
+  if (!plan.run) return;
+  lastPressPassAt = now;
+  console.log(`[presse] passe lancée en tâche de fond${plan.tomorrow ? " (aujourd'hui puis demain)" : ""}`);
+  pressPass = (async () => {
+    await runPressImport([]);
+    if (plan.tomorrow) await runPressImport(["--tomorrow"]);
+  })().finally(() => {
+    pressPass = null;
+  });
+}
+
 async function main() {
   loadLocalEnv();
   if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required");
@@ -100,6 +145,7 @@ async function main() {
   let passes = 0;
 
   do {
+    if (!once) maybeStartPressPass(deadline);
     const closest = await pass();
     passes += 1;
     if (once) break;
@@ -118,6 +164,9 @@ async function main() {
     const pauseMinutes = closest <= 15 ? 2 : closest <= 60 ? 5 : 10;
     await delay(pauseMinutes * 60_000);
   } while (Date.now() < deadline);
+
+  // Une passe presse encore en cours se termine avant la fin du job (bornée).
+  if (pressPass) await Promise.race([pressPass, delay(PRESS_PASS_MARGIN_MS)]);
 
   console.log(`[live] terminé après ${passes} passages`);
 }

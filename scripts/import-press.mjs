@@ -7,6 +7,12 @@
  *   node scripts/import-press.mjs --dry-run           # affiche sans écrire
  *   node scripts/import-press.mjs --from-pmu --dry-run   # courses lues sur l'API PMU (sans base)
  *   node scripts/import-press.mjs --only geny,zeturf  # sous-ensemble de sources
+ *   node scripts/import-press.mjs --missing-only      # seulement les sélections absentes de la base
+ *   node scripts/import-press.mjs --tomorrow          # courses du lendemain (Paris)
+ *
+ * `--missing-only` sert aux passes répétées de la boucle en direct
+ * (scripts/live-refresh.ts) : une course déjà relevée chez une source n'est pas
+ * redemandée à son site, et une source complète n'est pas contactée du tout.
  *
  * Règles : une seule exécution séquentielle, client HTTP poli (voir
  * scripts/lib/press-sources/http.mjs) et UNIQUEMENT des courses non parties —
@@ -20,13 +26,16 @@ import { createPoliteHttp } from "./lib/press-sources/http.mjs";
 import { PRESS_SOURCES } from "./lib/press-sources/index.mjs";
 import { PMU_PRESSE_HOST, pmuDate } from "./lib/press-sources/pmu-presse.mjs";
 import { isUpcoming, parisIsoDate, racesFromPmuProgramme } from "./lib/press-sources/races.mjs";
+import { racesMissingSource, selectionKey } from "./lib/press-sources/schedule.mjs";
 
 function parseArgs(argv) {
-  const options = { date: parisIsoDate(0), dryRun: false, fromPmu: false, only: null };
+  const options = { date: parisIsoDate(0), dryRun: false, fromPmu: false, only: null, missingOnly: false };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--dry-run") options.dryRun = true;
     else if (arg === "--from-pmu") options.fromPmu = true;
+    else if (arg === "--missing-only") options.missingOnly = true;
+    else if (arg === "--tomorrow") options.date = parisIsoDate(1);
     else if (arg === "--only") {
       options.only = String(argv[index + 1] ?? "").split(",").map((key) => key.trim()).filter(Boolean);
       index += 1;
@@ -68,6 +77,17 @@ async function loadRacesFromPmu(http, date) {
   const response = await http.get(url, { accept: "application/json" });
   if (response.status !== 200) throw new Error(`programme PMU indisponible (HTTP ${response.status}) : ${url}`);
   return racesFromPmuProgramme(JSON.parse(response.text), date);
+}
+
+/** Couples (course, source) déjà enregistrés pour la date, sous forme de clés. */
+async function loadExistingKeys(sql, date) {
+  const rows = await sql`
+    select p.race_id, p.source
+      from press_selections p
+      join races r on r.id = p.race_id
+     where r.race_date = ${date}
+  `;
+  return new Set(rows.map((row) => selectionKey(row.race_id, row.source)));
 }
 
 async function writeSelections(sql, source, selections) {
@@ -122,11 +142,27 @@ async function main() {
   const summary = [];
   const byId = new Map(upcoming.map((race) => [race.id, race]));
 
+  let existing = new Set();
+  if (options.missingOnly && sql) {
+    try {
+      existing = await loadExistingKeys(sql, options.date);
+    } catch (error) {
+      // Lecture impossible : passe complète plutôt qu'aucune passe.
+      console.warn("[presse] sélections existantes illisibles, passe complète :", error instanceof Error ? error.message : error);
+    }
+  }
+
   for (const collector of sources) {
     const { key, label } = collector.SOURCE;
+    const wanted = options.missingOnly ? racesMissingSource(upcoming, existing, key) : upcoming;
+    if (wanted.length === 0) {
+      summary.push({ source: key, statut: "complet", courses: 0, ecrites: 0, detail: "toutes les courses à venir sont déjà relevées" });
+      console.log(`[presse] ${label} : complet — aucune requête envoyée`);
+      continue;
+    }
     let result;
     try {
-      result = await collector.collect({ date: options.date, races: upcoming, http });
+      result = await collector.collect({ date: options.date, races: wanted, http });
     } catch (error) {
       result = { status: "error", selections: [], detail: error instanceof Error ? error.message : String(error) };
     }

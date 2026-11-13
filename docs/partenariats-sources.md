@@ -44,10 +44,22 @@ ignorée.
 
 ## Cadence
 
-Une passe par exécution du workflow `Import PMU programme`
-(`.github/workflows/import_pmu.yml`, étape « Import press selections »), soit
-deux fois par jour (04 h 30 et 17 h 30 UTC), juste après l'import PMU. Chaque
-passe est séquentielle : une source après l'autre.
+La boucle en direct (`scripts/live-refresh.ts`, workflow `Live refresh`) lance
+une passe en tâche de fond à son démarrage, puis toutes les 2 h 30, entre 6 h et
+minuit (Paris) ; à partir de 18 h, la passe relève aussi les courses du
+lendemain. Ces passes utilisent `--missing-only` : une course déjà relevée chez
+une source n'est pas redemandée à son site, et une source complète n'est pas
+contactée. Règles dans `scripts/lib/press-sources/schedule.mjs`.
+
+Une passe complète (qui rafraîchit aussi les sélections déjà relevées) reste
+faite par le workflow `Import PMU programme`
+(`.github/workflows/import_pmu.yml`, étape « Import press selections »), deux
+fois par jour après l'import PMU. Elle ne suffit pas seule : GitHub déclenche ce
+workflow avec des heures de retard (13 h 28 au lieu de 05 h 30 à Paris le
+13/11/2026), et comme seules les courses pas encore parties sont écrites, les
+courses du matin restaient sans sélection.
+
+Chaque passe est séquentielle : une source après l'autre.
 
 ## Identité et politesse du robot
 
@@ -57,7 +69,7 @@ passe est séquentielle : une source après l'autre.
 - respect des règles `Disallow` de robots.txt (groupe `*`, ou groupe nommant
   notre robot), relu à chaque exécution ;
 - délai maximal de 20 s par requête ;
-- au plus 120 requêtes par site et par exécution (une journée de courses) ;
+- au plus 120 requêtes par site et par passe (une journée de courses) ;
 - aucune reprise automatique sur un refus (401, 403, 429, 451).
 
 ## Règle : aucun contournement
