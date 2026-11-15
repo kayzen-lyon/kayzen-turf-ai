@@ -495,3 +495,19 @@ create table if not exists press_selections (
   primary key (race_id, source)
 );
 create index if not exists press_selections_race_idx on press_selections (race_id);
+
+-- Cotes du simple gagnant chez les opérateurs partenaires (ZEturf, Genybet),
+-- relevées sur les pages course lues pour les sélections presse : cinq relevés
+-- au plus par course et par opérateur (le matin, H-60, H-15, H-5, H-2), toujours
+-- AVANT le départ. `numbers[i]` porte `odds[i]` ; `reference[i]` est la cote du
+-- matin publiée par l'opérateur lui-même quand elle existe (ZEturf, 10 h 30).
+-- Écrites par scripts/operator-odds-loop.mjs, lues par src/lib/live/operator-odds.ts.
+create table if not exists operator_odds (
+  race_id text not null references races(id) on delete cascade,
+  operator text not null,
+  observed_at timestamptz not null,
+  numbers smallint[] not null,
+  odds real[] not null,
+  reference real[],
+  primary key (race_id, operator, observed_at)
+);

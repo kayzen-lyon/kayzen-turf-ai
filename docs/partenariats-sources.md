@@ -61,6 +61,32 @@ courses du matin restaient sans sélection.
 
 Chaque passe est séquentielle : une source après l'autre.
 
+## Cotes des opérateurs (ZEturf, Genybet)
+
+Depuis le 15/11/2026, les tableaux « Marché par opérateur » de la page course
+affichent aussi les cotes du simple gagnant de ZEturf et de Genybet. Elles sont
+lues sur les **mêmes pages course** que les sélections :
+
+- ZEturf : bloc `cotesInfos` de la page course — cote de référence de ZEturf
+  (10 h 30) et cote du simple gagnant au moment de la lecture ;
+- Genybet : champ `coteGeny` des partants de la page course de geny.com.
+
+Seuls les numéros et les cotes sont gardés, dans la table
+`operator_odds (race_id, operator, observed_at, numbers, odds, reference)`,
+toujours avant le départ.
+
+Cadence (`scripts/operator-odds-loop.mjs`, lancé par la boucle en direct) : cinq
+relevés au plus par course et par opérateur — le matin (à partir de 9 h), puis à
+60, 15, 5 et 2 minutes du départ. Pour une journée de 90 courses, cela fait
+environ 450 pages par site et par jour, espacées d'au moins 1,5 s, au plus 700
+par boucle de 5 h 30. Un refus (401, 403, 429) arrête l'opérateur jusqu'à la
+boucle suivante. `OPERATOR_ODDS=off` (variable d'environnement du workflow)
+désactive tout le relevé ; `OPERATOR_ODDS=zeturf` ne garde qu'un opérateur.
+
+**À confirmer avec chaque partenaire** : l'accord consigné plus bas porte sur les
+sélections. La reprise de leurs cotes et cette cadence plus soutenue doivent y
+figurer explicitement.
+
 ## Identité et politesse du robot
 
 - User-Agent : `KayzenTurfBot/1.0 (+https://kayzen-turf-ai.vercel.app/methode)`,

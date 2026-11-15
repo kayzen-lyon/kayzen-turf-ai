@@ -17,7 +17,7 @@ import { MarketPanel } from "@/components/course/market-panel";
 import { NonRunners } from "@/components/course/non-runners";
 import { SectionNavBar, SectionNavRail } from "@/components/course/section-nav";
 import { PressPanel } from "@/components/course/press-panel";
-import { StakeBoardPanel } from "@/components/course/stake-board";
+import { OperatorBoardsPanel } from "@/components/course/operator-boards";
 import { SurprisePanel } from "@/components/course/surprise-panel";
 import { PostRacePanel, SimulationPanel } from "@/components/course/side-panels";
 import { TicketShare } from "@/components/course/ticket-share";
@@ -56,7 +56,7 @@ import type { RaceAnalysis } from "@/lib/types";
  *   5. la fiche du cheval sélectionné ; à côté, son marché, les cotes de tous
  *      les partants et la simulation ;
  *   6. les tickets : copie au format PMU, partage en image, outils repliés ;
- *   7. tout en bas, les mises en direct PMU+ / PMU Play × force IA.
+ *   7. tout en bas, le marché par opérateur : ZEturf, Genybet, PMU+.
  *
  * Un sommaire (rail sur grand écran, pastilles sur mobile) suit la lecture.
  * Les blocs vivent sous src/components/course/.
@@ -206,10 +206,18 @@ export function CourseDetail({ race, history = EMPTY_HISTORY, signals = NO_SIGNA
             {race.oddsAvailable === false && (
               <div className="mt-4 flex items-start gap-3 rounded-2xl border border-warn/30 bg-warn-lo px-4 py-3 text-sm leading-6 text-warn sm:px-5" role="status">
                 <AlertTriangle aria-hidden="true" className="mt-1 shrink-0" size={16} />
-                <p>
-                  <strong className="font-bold">Cotes PMU non encore publiées pour cette course.</strong> Le classement repose
-                  sur l&apos;IA seule et sera recalculé dès l&apos;ouverture du marché.
-                </p>
+                {finished ? (
+                  <p>
+                    <strong className="font-bold">Les cotes PMU de cette course n&apos;ont pas été enregistrées.</strong> Le relevé
+                    automatique n&apos;a pas tourné avant le départ : le classement affiché repose sur l&apos;IA seule, et les colonnes de
+                    cotes et de mises restent vides.
+                  </p>
+                ) : (
+                  <p>
+                    <strong className="font-bold">Cotes PMU non encore publiées pour cette course.</strong> Le classement repose
+                    sur l&apos;IA seule et sera recalculé dès l&apos;ouverture du marché.
+                  </p>
+                )}
               </div>
             )}
 
@@ -275,8 +283,8 @@ export function CourseDetail({ race, history = EMPTY_HISTORY, signals = NO_SIGNA
               </aside>
             </div>
 
-            <div className={SECTION_SCROLL} id="mises-direct">
-              <StakeBoardPanel onSelect={select} race={race} signals={signalMap} vm={vm} />
+            <div className={SECTION_SCROLL} id="marche-operateurs">
+              <OperatorBoardsPanel onSelect={select} race={race} vm={vm} />
             </div>
           </div>
         </div>

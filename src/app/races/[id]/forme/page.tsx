@@ -4,12 +4,13 @@ import { cache } from "react";
 import { unstable_cache } from "next/cache";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Timer } from "lucide-react";
-import { ChronoTable, FormTable, Highlights, WeightTable } from "@/components/forme/form-board-view";
+import { ChronoTable, FormTable, Highlights, TrainerTable, WeightTable } from "@/components/forme/form-board-view";
 import { EmptyState } from "@/components/ui-kit";
 import { formatMeters, hasOdds, properName } from "@/lib/format";
 import { demoPerformances } from "@/lib/performances/demo";
-import { buildFormBoard, type BoardRunner } from "@/lib/performances/form-board";
+import { buildFormBoard, DISTANCE_TOLERANCE, type BoardRunner } from "@/lib/performances/form-board";
 import { fetchRacePerformances, type DetailedRun } from "@/lib/performances/pmu-performances";
+import { fetchTrainerDistanceStats, rankTrainers, type RankedTrainer, type TrainerDistanceRow } from "@/lib/performances/trainer-distance";
 import { estModeDemonstration, getRaceById } from "@/lib/race-repository";
 import type { RaceAnalysis } from "@/lib/types";
 
@@ -55,6 +56,25 @@ const loadPerformances = unstable_cache(
   ["forme-performances"],
   { revalidate: 3600 },
 );
+
+/**
+ * Réussite des entraîneurs sur la distance : agrégat sur l'historique, qui ne
+ * change qu'avec les arrivées du jour. Gardé six heures par course ; un échec
+ * lève et n'est pas gardé.
+ */
+const loadTrainerStats = unstable_cache(fetchTrainerDistanceStats, ["forme-trainers"], { revalidate: 21_600 });
+
+/** Statistiques FICTIVES des entraîneurs pour le mode démonstration. */
+function demoTrainerStats(race: RaceAnalysis): TrainerDistanceRow[] {
+  const byTrainer = new Map<string, number[]>();
+  for (const horse of race.horses) byTrainer.set(horse.trainer, [...(byTrainer.get(horse.trainer) ?? []), horse.number]);
+  return [...byTrainer.entries()].map(([name, numbers]) => {
+    const seed = (numbers[0] * 31 + name.length * 7) % 40;
+    const runs = seed < 6 ? seed % 4 : 8 + seed;
+    const wins = Math.floor((runs * (5 + (seed % 14))) / 100);
+    return { trainerId: name, name, numbers, runs, wins, places: Math.min(runs, wins + Math.floor(runs * 0.22)) };
+  });
+}
 
 function meters(distance: string): number | null {
   const digits = String(distance ?? "").replace(/\D/g, "");
@@ -127,6 +147,13 @@ export default async function FormePage({ params }: PageProps) {
     }
   }
 
+  let trainers: RankedTrainer[] | null = null;
+  try {
+    trainers = rankTrainers(demo ? demoTrainerStats(race) : await loadTrainerStats(race.id, race.discipline));
+  } catch (cause) {
+    console.error("Statistiques des entraîneurs illisibles pour %s", race.id, cause);
+  }
+
   const board = performances
     ? buildFormBoard({ date: race.raceDate, discipline: race.discipline, specialty: race.specialty, distance }, runnersOf(race, demo), performances)
     : null;
@@ -193,6 +220,14 @@ export default async function FormePage({ params }: PageProps) {
               ? "Le PMU n'a pas répondu. Les chronos, les poids et la forme reviendront au prochain chargement de la page."
               : "Le PMU ne publie pas les dernières courses des partants de cette course."}
           </EmptyState>
+        )}
+
+        {trainers && trainers.length > 0 ? (
+          <TrainerTable distance={race.distance} toleranceMeters={DISTANCE_TOLERANCE[race.discipline]} trainers={trainers} />
+        ) : (
+          <p className="mt-4 rounded-2xl border border-border bg-surface px-4 py-3 text-sm leading-6 text-muted shadow-sm sm:px-5">
+            {trainers ? "Aucun entraîneur n'est renseigné pour cette course." : "Le classement des entraîneurs sur la distance est momentanément indisponible."}
+          </p>
         )}
       </div>
     </main>

@@ -22,7 +22,7 @@ export const COURSE_SECTIONS = [
   { id: "marche", label: "Marché" },
   { id: "simulation", label: "Simulation" },
   { id: "apres-course", label: "Après-course" },
-  { id: "mises-direct", label: "Mises en direct" },
+  { id: "marche-operateurs", label: "Opérateurs" },
 ] as const;
 
 type SectionId = (typeof COURSE_SECTIONS)[number]["id"];

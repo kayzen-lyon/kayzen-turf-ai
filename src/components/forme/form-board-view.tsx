@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Activity, Scale, Sparkles, Timer } from "lucide-react";
+import { Activity, Scale, Sparkles, Timer, Users } from "lucide-react";
 import { formatMeters, formatOdds, properName } from "@/lib/format";
 import {
   FORM_THRESHOLDS,
@@ -12,6 +12,7 @@ import {
   type WeightTrend,
 } from "@/lib/performances/form-board";
 import type { DetailedRun } from "@/lib/performances/pmu-performances";
+import { TRAINER_MIN_RUNS, type RankedTrainer } from "@/lib/performances/trainer-distance";
 
 /**
  * CHRONOS, POIDS ET FORME — tableaux de la page /races/[id]/forme.
@@ -26,7 +27,8 @@ const FORM_LABELS: Record<FormLevel, string> = {
 };
 
 const FORM_STYLES: Record<FormLevel, string> = {
-  bonne: "bg-emerald-600 text-white dark:bg-emerald-500 dark:text-emerald-950",
+  // emerald-700 : le blanc sur emerald-600 reste sous 4,5:1 en petit texte (WCAG 1.4.3).
+  bonne: "bg-emerald-700 text-white dark:bg-emerald-500 dark:text-emerald-950",
   moyenne: "bg-amber-500 text-amber-950",
   mauvaise: "bg-red-600 text-white dark:bg-red-500 dark:text-red-950",
   inconnue: "border border-border bg-surface-sub text-muted",
@@ -263,6 +265,64 @@ export function WeightTable({ board }: { board: FormBoard }) {
         L&apos;écart compare le poids du jour à la moyenne des trois dernières courses (de la plus récente à la plus ancienne). Allégé ou
         chargé à partir de {FORM_THRESHOLDS.weightDeltaKg} kg d&apos;écart. Un poids plus léger aide, mais il accompagne souvent une course
         d&apos;un niveau différent.
+      </p>
+    </Panel>
+  );
+}
+
+function percent(value: number | null): string {
+  return value === null ? "—" : `${value.toFixed(1).replace(".", ",")} %`;
+}
+
+/** Entraîneurs de la course classés par réussite sur des courses de distance comparable. */
+export function TrainerTable({ trainers, distance, toleranceMeters }: { trainers: RankedTrainer[]; distance: string; toleranceMeters: number }) {
+  const ranked = trainers.filter((t) => t.reliable).length;
+  return (
+    <Panel
+      aside={`${ranked} entraîneur${ranked > 1 ? "s" : ""} sur ${trainers.length} avec au moins ${TRAINER_MIN_RUNS} courses`}
+      icon={<Users size={16} />}
+      id="titre-entraineurs"
+      title={`Entraîneurs sur ${formatMeters(distance)}`}
+    >
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[720px] border-collapse text-left text-sm">
+          <caption className="sr-only">Entraîneurs de la course classés du meilleur taux de victoire au moins bon sur des courses de distance comparable</caption>
+          <thead>
+            <tr className={HEAD_ROW}>
+              <th className={`${TH} text-center`} scope="col">Rang</th>
+              <th className={TH} scope="col">Entraîneur</th>
+              <th className={TH} scope="col">Chevaux dans la course</th>
+              <th className={`${TH} text-right`} scope="col">Courses</th>
+              <th className={`${TH} text-right`} scope="col">Victoires</th>
+              <th className={`${TH} text-right`} scope="col">Taux de victoire</th>
+              <th className={`${TH} text-right`} scope="col">Dans les 3 premiers</th>
+              <th className={`${TH} text-right`} scope="col">Taux de places</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {trainers.map((trainer) => (
+              <tr key={trainer.trainerId} className={trainer.rank !== null && trainer.rank <= 3 ? "bg-accent-lo/50" : undefined}>
+                <td className="px-3 py-2 text-center font-mono font-bold text-fg">{trainer.rank ?? "—"}</td>
+                <th className="px-3 py-2 font-semibold text-fg" scope="row">{properName(trainer.name)}</th>
+                <td className="px-3 py-2 font-mono text-xs text-muted">{trainer.numbers.map((n) => `n° ${n}`).join(" · ")}</td>
+                <td className="px-3 py-2 text-right font-mono text-xs">{trainer.runs}</td>
+                <td className="px-3 py-2 text-right font-mono text-xs">{trainer.wins}</td>
+                <td className="whitespace-nowrap px-3 py-2 text-right font-mono font-bold text-fg">
+                  {percent(trainer.winRate)}
+                  {!trainer.reliable && trainer.runs > 0 && <span className="ml-1 text-[10px] font-normal text-muted">(peu de courses)</span>}
+                </td>
+                <td className="px-3 py-2 text-right font-mono text-xs">{trainer.places}</td>
+                <td className="whitespace-nowrap px-3 py-2 text-right font-mono text-xs">{percent(trainer.placeRate)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="border-t border-border px-4 py-3 text-[11px] leading-5 text-muted sm:px-5">
+        Ce n&apos;est pas un classement général : seules comptent les courses de la même discipline (même spécialité au trot), à{" "}
+        {toleranceMeters} m près de la distance du jour, courues avant cette course et enregistrées dans notre base. Classement par taux
+        de victoire, puis par taux de places. Sous {TRAINER_MIN_RUNS} courses, un taux ne veut rien dire : ces entraîneurs sont listés
+        après les autres, sans rang. Un bon taux passé ne garantit pas le résultat du jour.
       </p>
     </Panel>
   );

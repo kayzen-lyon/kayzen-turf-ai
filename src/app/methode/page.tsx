@@ -10,7 +10,7 @@ import { MARKET_GAMMA, MODEL_VERSION, PLACE_LAMBDAS } from "@/lib/probability";
 import { PROFILES_VERSION, PROFILE_LABELS, PROFILE_RULES, READING_LABELS, READING_RULES, type RaceReading } from "@/lib/profiles";
 import { ProfileBadge } from "@/components/course/shared";
 import { PRESS_THRESHOLDS } from "@/lib/press-consensus";
-import { STAKE_WINDOW_MIN } from "@/lib/stake-board";
+import { FINAL_WINDOW_MIN, STABLE_PCT } from "@/lib/operator-board";
 import {
   SURPRISE_FULL_AI_PCT,
   SURPRISE_FULL_RATIO,
@@ -195,18 +195,19 @@ export default function MethodePage() {
               enjeux par cheval, jamais par parieur : nous mesurons de l&apos;argent joué, jamais « l&apos;argent des initiés ».
             </p>
             <p>
-              <strong className="text-fg">Mises en direct</strong> : enjeux du simple gagnant publiés par le PMU, en point
-              de vente (PMU+) et en ligne (PMU Play). Le classement suit l&apos;argent reçu depuis un relevé vieux d&apos;au
-              moins {STAKE_WINDOW_MIN} minutes. Les mises d&apos;un cheval ne baissent pas en pari mutuel : la flèche est verte
-              s&apos;il reçoit plus vite que la course, rouge s&apos;il reçoit moins vite. La cote du matin est la cote de
-              référence du PMU, figée avant son recalage à 30 minutes du départ.
+              <strong className="text-fg">Marché par opérateur</strong> : trois tableaux indépendants, un par opérateur
+              (ZEturf, Genybet, PMU+), car chacun a ses propres parieurs et ses propres cotes. Chaque tableau donne le
+              rang et la cote du matin, la cote actuelle, l&apos;évolution, le rang actuel et le classement final. La cote
+              du matin est la cote de référence publiée par l&apos;opérateur quand elle existe (ZEturf : sa cote de
+              10 h 30 ; PMU : sa cote de référence, figée avant son recalage à 30 minutes du départ), sinon notre premier
+              relevé du jour. Sous {STABLE_PCT} % d&apos;écart, la cote est dite stable. Le classement final est celui du
+              relevé fait dans les {FINAL_WINDOW_MIN} dernières minutes avant le départ ; il reste vide s&apos;il n&apos;y en a pas.
             </p>
             <p>
-              <strong className="text-fg">Force IA sur 100</strong> : probabilité du modèle fondamental, qui ne voit jamais
-              la cote, rapportée à une chance égale entre les partants. 50 correspond à la chance moyenne de la course, et
-              la note gagne 14 points chaque fois que cette chance double. Elle lit la musique, les gains, l&apos;âge, le sexe,
-              les œillères, le recul ou le numéro, et la réussite du jockey et de l&apos;entraîneur. Le modèle en production
-              ne lit encore ni la distance, ni le terrain, ni les chronos, ni le poids.
+              <strong className="text-fg">Relevés</strong> : PMU+ (paris en point de vente) est lu chaque minute sur les
+              données publiées par le PMU. ZEturf et Genybet sont relevés sur leurs pages publiques le matin, puis à 60,
+              15, 5 et 2 minutes du départ : entre deux relevés, leur cote « actuelle » est celle du dernier relevé, dont
+              l&apos;heure est affichée. Ces tableaux décrivent le marché ; ils ne recommandent aucun pari.
             </p>
             <p>
               <strong className="text-fg">Confrontation IA × marché</strong> : seuls les chevaux à au moins{" "}

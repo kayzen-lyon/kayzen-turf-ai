@@ -22,6 +22,24 @@ export type EntreeChangelog = {
 
 export const CHANGELOG: readonly EntreeChangelog[] = [
   {
+    date: "2026-11-15",
+    titre: "Marché par opérateur et entraîneurs sur la distance",
+    changements: [
+      {
+        categorie: "Ajouté",
+        elements: [
+          "Page course : trois tableaux indépendants pour ZEturf, Genybet et PMU+, avec le rang et la cote du matin, la cote actuelle, l'évolution, le rang actuel et le classement final des deux dernières minutes avant le départ.",
+          "Un tableau des écarts entre opérateurs : rang et cote de chaque cheval chez chacun, et meilleure cote.",
+          "Page « Chronos, poids et forme » : les entraîneurs de la course classés selon leur réussite sur des courses de distance comparable.",
+        ],
+      },
+      {
+        categorie: "Modifié",
+        elements: ["Le tableau « Mises en direct PMU+ / PMU Play » est remplacé par ces trois tableaux."],
+      },
+    ],
+  },
+  {
     date: "2026-11-13",
     titre: "Chronos, poids et forme — et la presse sur toutes les courses",
     changements: [

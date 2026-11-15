@@ -134,6 +134,25 @@ function maybeStartPressPass(deadline: number) {
   });
 }
 
+/**
+ * COTES DES OPÉRATEURS (ZEturf, Genybet)
+ *
+ * Relevées par un processus séparé qui tourne pendant toute la boucle
+ * (scripts/operator-odds-loop.mjs) : le matin puis à H-60, H-15, H-5 et H-2 de
+ * chaque course. Séparé pour la même raison que la presse : 1,5 s entre deux
+ * requêtes par site, sans jamais retarder les cotes PMU.
+ */
+function startOperatorOdds(minutes: number): Promise<void> {
+  return new Promise((resolve) => {
+    const child = spawn(process.execPath, ["scripts/operator-odds-loop.mjs", "--minutes", String(Math.max(1, Math.floor(minutes)))], { stdio: "inherit" });
+    child.on("error", (error) => {
+      console.warn(`[cotes] relevé des opérateurs non lancé : ${error.message}`);
+      resolve();
+    });
+    child.on("close", () => resolve());
+  });
+}
+
 async function main() {
   loadLocalEnv();
   if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required");
@@ -143,6 +162,7 @@ async function main() {
   else console.log(`[push] ${await purgeStaleSubscriptions()} abonnement(s) expiré(s) supprimé(s)`);
   const deadline = Date.now() + Number(arg("minutes") ?? 330) * 60_000;
   let passes = 0;
+  const operatorOdds = once ? null : startOperatorOdds((deadline - Date.now()) / 60_000);
 
   do {
     if (!once) maybeStartPressPass(deadline);
@@ -167,6 +187,8 @@ async function main() {
 
   // Une passe presse encore en cours se termine avant la fin du job (bornée).
   if (pressPass) await Promise.race([pressPass, delay(PRESS_PASS_MARGIN_MS)]);
+  // Le relevé des opérateurs s'arrête de lui-même à la même échéance.
+  if (operatorOdds) await Promise.race([operatorOdds, delay(60_000)]);
 
   console.log(`[live] terminé après ${passes} passages`);
 }

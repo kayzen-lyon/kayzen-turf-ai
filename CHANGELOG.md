@@ -10,6 +10,17 @@ qu'un visiteur peut constater, vit dans `src/lib/changelog.ts` et s'affiche sur
 
 ## [Non publié]
 
+### Ajouté
+- Marché par opérateur (`src/lib/operator-board.ts`, `src/components/course/operator-boards.tsx`, `GET /api/races/[id]/operators`) : trois tableaux indépendants — ZEturf, Genybet, PMU+ — avec rang et cote du matin, cote actuelle, évolution, rang actuel, places gagnées ou perdues et classement final des deux dernières minutes, puis un tableau des écarts entre opérateurs. Les cotes ZEturf et Genybet sont relevées sur les pages course déjà lues pour la presse (`scripts/lib/press-sources/odds.mjs`), le matin puis à H-60, H-15, H-5 et H-2, par `scripts/operator-odds-loop.mjs` (lancé par la boucle en direct) dans la nouvelle table `operator_odds`. `OPERATOR_ODDS=off` désactive le relevé.
+- Entraîneurs sur la distance (`src/lib/performances/trainer-distance.ts`, page `/races/[id]/forme`) : entraîneurs de la course classés par taux de victoire puis de places sur les courses de même discipline (même spécialité au trot) et de distance proche, courues avant la course. Sous 5 courses, pas de rang.
+
+### Supprimé
+- Tableau « Mises en direct PMU+ / PMU Play × Force IA », sa route `/api/races/[id]/stakes` et la note de force IA, remplacés par le marché par opérateur. Les relevés `stake_snapshots` restent écrits : ils portent la cote du matin de PMU+.
+
+### Corrigé
+- Page course : une course terminée sans aucune cote enregistrée n'affiche plus « Cotes PMU non encore publiées », mais dit que le relevé n'a pas tourné. Constat du 15/11/2026 : tous les workflows GitHub Actions étaient refusés depuis 0 h 55 (« recent account payments have failed or your spending limit needs to be increased »), donc plus aucune cote n'entrait en base.
+- Page « Chronos, poids et forme » : contraste de la pastille « Bonne forme » en thème clair (WCAG 1.4.3).
+
 ### Corrigé
 - Pronostics de la presse absents sur les courses du matin : la collecte ne tournait qu'avec l'import PMU, que GitHub déclenche avec des heures de retard (13 h 28 au lieu de 05 h 30 le 13/11/2026), et seules les courses pas encore parties sont écrites. La boucle en direct (`scripts/live-refresh.ts`) lance désormais elle-même une passe presse en tâche de fond, au démarrage puis toutes les 2 h 30 entre 6 h et minuit (Paris), et relève aussi le lendemain à partir de 18 h (`scripts/lib/press-sources/schedule.mjs`). `import-press.mjs --missing-only` ne redemande à un site que les courses qu'il n'a pas encore couvertes ; `--tomorrow` vise le lendemain.
 - Audit du 08/11/2026, pistes moyennes :
