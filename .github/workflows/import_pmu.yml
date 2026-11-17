@@ -7,8 +7,10 @@ on:
         description: "Optional PMU date in DDMMYYYY format"
         required: false
         type: string
+  # MODE ÉCONOMIE (depuis le 17/11/2026) : un seul import par jour, le soir.
+  # Il couvre la veille, le jour même et le lendemain (defaultDates) ; l'import
+  # du matin (04:30 UTC) a été retiré pour réduire les minutes d'Actions.
   schedule:
-    - cron: "30 4 * * *"
     - cron: "30 17 * * *"
 
 # Le job n'écrit rien dans le dépôt : lecture seule suffit.
