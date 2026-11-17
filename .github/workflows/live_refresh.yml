@@ -2,34 +2,28 @@ name: Live refresh
 
 # Cotes, parts des enjeux et pronostics gelés des courses imminentes.
 #
-# GitHub ne garantit pas l'heure des déclenchements planifiés : 8 passages réels
-# sur 60 prévus du 30/09 au 02/10/2026, puis 5 sur 32 le 03/10 avec des écarts
-# de 4 à 9 heures. Des boucles de trois heures laissaient donc 40 % des courses
-# partir sans cote fraîche.
+# MODE ÉCONOMIE (depuis le 17/11/2026) : un seul passage par jour.
 #
-# Chaque job lance une boucle de 5 h 30 (scripts/live-refresh.ts), puis relance
-# lui-même le passage suivant par workflow_dispatch : la chaîne tourne en continu
-# sans dépendre du planificateur. Le cron n'est plus qu'un filet pour la
-# redémarrer si un runner disparaît en cours de route.
+# La chaîne de boucles de 5 h 30 qui se relançaient elles-mêmes tournait
+# 24 h/24 et consommait environ 43 000 minutes d'Actions par mois pour un quota
+# gratuit de 2 000. Le workflow fait désormais un passage unique (--once) par
+# jour, sans relance automatique.
+#
+# Le passage de 12:35 UTC (13:35 à Paris en hiver, 14:35 en été) rafraîchit les
+# courses qui partent dans les 90 minutes, ce qui couvre en général le Quinté.
+# Les autres courses gardent les cotes de l'import du programme (import_pmu.yml).
+#
+# Pour revenir au mode continu : restaurer la version précédente de ce fichier
+# (git log -- .github/workflows/live_refresh.yml).
 
 on:
   workflow_dispatch:
-    inputs:
-      minutes:
-        description: "Durée de la boucle en minutes"
-        required: false
-        default: "330"
-        type: string
   schedule:
-    - cron: "3 */2 * * *"
+    - cron: "35 12 * * *"
 
 permissions:
   contents: read
-  actions: write # relance du passage suivant
 
-# Un seul passage à la fois. Un déclenchement qui arrive pendant une boucle
-# attend son tour au lieu de l'interrompre ; GitHub ne garde qu'un passage en
-# attente, la chaîne ne peut donc pas se dédoubler.
 concurrency:
   group: live-refresh
   cancel-in-progress: false
@@ -37,13 +31,11 @@ concurrency:
 jobs:
   live-refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 355
+    timeout-minutes: 20
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       # Clé privée des alertes push (src/lib/push/send.ts).
       VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
-      # Entrée passée par l'environnement, jamais interpolée dans `run:`.
-      LOOP_MINUTES: ${{ inputs.minutes || '330' }}
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -63,20 +55,6 @@ jobs:
           DATABASE_URL: ""
           VAPID_PRIVATE_KEY: ""
 
-      - name: Refresh imminent races
-        id: refresh
-        timeout-minutes: 340
-        run: npx tsx scripts/live-refresh.ts --minutes "$LOOP_MINUTES"
-
-      # Quota Neon dépassé : la base est fermée, relancer toutes les six minutes
-      # ne sert à rien. Le cron (toutes les deux heures) réessaie.
-      - name: Relaunch next loop
-        if: always() && steps.refresh.outputs.quota_exceeded != 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-          OUTCOME: ${{ job.status }}
-        run: |
-          # Après un échec, on attend avant de relancer pour ne pas enchaîner
-          # des passages ratés à la minute.
-          if [ "$OUTCOME" != "success" ]; then sleep 300; fi
-          gh workflow run live_refresh.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME"
+      - name: Refresh imminent races (single pass)
+        timeout-minutes: 10
+        run: npx tsx scripts/live-refresh.ts --once
